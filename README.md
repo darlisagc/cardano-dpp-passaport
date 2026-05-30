@@ -15,7 +15,7 @@ Os quatro atores da cadeia de suprimentos sao:
 
 Cada ator **emite** uma credencial contendo dados do produto (GTIN, origem, pegada de carbono, composicao de materiais) e uma referencia (`ref_*_tx`) apontando para a transacao do ator anterior. O **verificador** percorre essa cadeia de tras para frente — da credencial do pack (ou reciclagem) ate a origem do litio — para reconstruir e validar o passaporte completo.
 
-> **Nota sobre carteiras:** Diferente da versao Python deste workshop, nesta implementacao TypeScript **cada ator possui sua propria carteira** (chave privada independente, endereco Enterprise). O pipeline gera 4 novos mnemonicos BIP-39, deriva os enderecos via CIP-1852, e transfere ADA da carteira principal para financiar cada ator. Isso simula o cenario real onde somente a empresa responsavel pode assinar credenciais em seu nome.
+> **Nota sobre carteiras:** Nesta implementacao, **cada ator possui sua propria carteira** (chave privada independente, endereco Enterprise). O pipeline gera 4 novos mnemonicos BIP-39, deriva os enderecos via CIP-1852, e transfere ADA da carteira principal para financiar cada ator. Isso simula o cenario real onde somente a empresa responsavel pode assinar credenciais em seu nome.
 
 > **Rede:** Tudo roda na **testnet preprod do Cardano** — Blockfrost preprod, faucet de tADA, Cexplorer preprod, API UVerify preprod. Nenhum ADA real e utilizado.
 
@@ -123,19 +123,6 @@ cardano-dpp-passaport/
 | `@std/dotenv` (jsr, >= 0.225) | Carrega variaveis de ambiente do arquivo `.env` |
 
 Versoes exatas estao fixadas no `deno.lock` (commitado para builds reproduziveis).
-
-## Diferenca da versao Python
-
-Este projeto e uma reimplementacao em **TypeScript/Deno** do [cardano-battery-passport](https://github.com/darlisagc/cardano-battery-passport) (Python), com uma mudanca arquitetural importante:
-
-| Aspecto | Python (original) | TypeScript (este repo) |
-|---------|-------------------|----------------------|
-| **Carteiras** | Carteira unica compartilhada por todos os atores | Carteira independente por ator (Enterprise address) |
-| **Financiamento** | Manual (tADA ja na carteira) | Automatico (tx unica com 4 outputs) |
-| **Runtime** | Python 3.11+ com `uv` | Deno 2.0+ (sem `npm install`) |
-| **SDK Cardano** | PyCardano + blockfrost-python | @evolution-sdk/evolution |
-| **SDK UVerify** | uverify-sdk (Python) | @uverify/sdk (JavaScript) |
-| **Assinatura CIP-8** | PyCardano COSE | evolution-sdk COSE.SignData |
 
 ## Troubleshooting
 

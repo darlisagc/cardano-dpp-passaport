@@ -4,6 +4,23 @@
 
 ---
 
+## A historia — De Jequitinhonha a Europa
+
+A partir de **fevereiro de 2027**, a Uniao Europeia passa a exigir um **Battery Passport** digital para todo pack EV que entrar na Europa. Sem passaporte, sem mercado europeu. O Brasil tem os ingredientes — litio no Vale do Jequitinhonha (MG), fabricas em Camacari (BA) e em Sao Bernardo do Campo (SP), regulacao de logistica reversa (PNRS) — mas falta a camada tecnica que prove, para qualquer parte, **de onde aquele pack veio e o que aconteceu com ele**.
+
+Neste hands-on, **voce interpreta os quatro atores** de uma unica cadeia:
+
+- Em **2026**, a *MineraLitio* extrai um lote de Li2CO3 em Aracuai (MG) e emite o primeiro DPP — **origem**.
+- Logo depois, a *CellTech* monta celulas NMC em Camacari (BA) e emite **celula**, referenciando *origem*.
+- Em Sao Bernardo do Campo (SP), a *PackMontadora* monta o pack de 75 kWh e emite **pack**, referenciando *celula*.
+- Em **2028** o pack viaja num EV brasileiro exportado para a UE; depois da vida util em algum estacionamento de Bruxelas, **dez anos depois** o pack volta ao Brasil e cai na *RecicLar*, em Sorocaba (SP), que **verifica a cadeia inteira on-chain antes de processar** — so entao emite o DPP de **reciclagem**, fechando o ciclo.
+
+Cada DPP e uma transacao no Cardano. As **referencias cruzadas** entre as credenciais (`ref_*_tx`) sao o que torna a cadeia auditavel por *qualquer parte* — regulador europeu, comprador europeu, recicladora brasileira — sem pedir permissao a um gatekeeper.
+
+> **Nota sobre rede:** O workshop inteiro — carteira, faucet, Cexplorer, Blockfrost, UVerify — usa **preprod**.
+
+---
+
 ## Indice
 
 - [Secao 0 — Pre-requisitos](#secao-0--pre-requisitos)
@@ -56,7 +73,7 @@ Edite o arquivo `.env` com suas credenciais:
 BLOCKFROST_PROJECT_ID=preprodSUACHAVEAQUI
 
 # Mnemonico da carteira principal (24 palavras) — SOMENTE TESTNET!
-# Esta carteira financia as 4 carteiras dos atores com 50 ADA cada (200 ADA total)
+# Esta carteira financia as 4 carteiras dos atores (padrao: 50 ADA cada)
 WALLET_MNEMONIC=word1 word2 word3 ... word24
 
 # URL da API UVerify (padrao: preprod)
@@ -183,9 +200,9 @@ graph TD
 
 ### Diferenca arquitetural: cada ator tem sua propria carteira
 
-> **Melhoria importante em relacao a versao Python:** Nesta implementacao, **cada ator possui sua propria carteira** (chave privada independente, endereco Enterprise). Isso simula o cenario real onde somente a empresa responsavel pode assinar credenciais em seu nome.
+> **Arquitetura de carteiras:** Nesta implementacao, **cada ator possui sua propria carteira** (chave privada independente, endereco Enterprise). Isso simula o cenario real onde somente a empresa responsavel pode assinar credenciais em seu nome.
 
-Na versao Python, todos os 4 atores compartilhavam a mesma carteira. Aqui, o pipeline:
+O pipeline:
 
 1. **Gera 4 mnemonicos BIP-39** independentes (24 palavras, 256 bits cada)
 2. **Deriva enderecos Enterprise** via CIP-1852 (sem staking, mais simples)
@@ -241,7 +258,7 @@ Para cada um dos 4 atores, o pipeline:
 
 ### STEP 2: Transferencia de ADA (funding)
 
-Uma **unica transacao com 4 outputs** envia 50 ADA para cada carteira de ator:
+Uma **unica transacao com 4 outputs** envia ADA para cada carteira de ator (padrao: 50 ADA, configuravel via parametro `adaPerWallet`):
 
 ```typescript
 // src/transfer.ts — transacao unica para financiar todos os atores
@@ -601,31 +618,48 @@ O Deno usa um modelo de permissoes explicitas. O `deno.json` define as tasks com
 
 ## Glossario
 
+### Blockchain / Cardano
+
 | Termo | Descricao |
 |-------|-----------|
 | **ADA** | Criptomoeda nativa da blockchain Cardano. |
 | **tADA** | ADA de teste, sem valor real. Usada nas testnets. |
 | **BIP-39** | Padrao para gerar mnemonicos de 24 palavras que derivam chaves criptograficas. |
-| **Blockfrost** | Servico de infraestrutura que fornece API para acessar a blockchain Cardano sem rodar um no proprio. |
 | **CIP-8** | Cardano Improvement Proposal para assinatura de mensagens arbitrarias (COSE). |
 | **CIP-30** | Cardano Improvement Proposal que define a interface de carteiras Web (dApp connector). O formato `DataSignature` (`{key, signature}`) vem desta especificacao. |
 | **CIP-1852** | Padrao de derivacao de chaves para Cardano (baseado em BIP-44): caminho `m/1852'/1815'/account'/role/index`. |
 | **Colateral** | UTxO reservado (>= 5 ADA) exigido pela rede Cardano para executar scripts Plutus. Garante que mineradores sao compensados se o script falhar. |
 | **COSE** | CBOR Object Signing and Encryption — padrao usado por CIP-8 para assinar mensagens no formato `COSE_Sign1`. |
-| **data_hash** | `sha256(gtin + serial)` — impressao digital unica do produto. Usada como chave de busca no UVerify. |
-| **Deno** | Runtime TypeScript/JavaScript seguro. Nao precisa de `node_modules` e resolve dependencias por URL. |
-| **DPP** | Digital Product Passport (Passaporte Digital de Produto). |
 | **Enterprise address** | Endereco Cardano sem componente de staking. Mais simples, ideal para carteiras de servico. |
-| **GTIN** | Global Trade Item Number — codigo unico que identifica o *tipo* do produto (equivalente ao codigo de barras EAN/UPC). |
 | **Lovelace** | Menor unidade de ADA. 1 ADA = 1.000.000 lovelace. |
 | **Mnemonico** | Sequencia de 24 palavras que codifica a chave privada de uma carteira. |
 | **Plutus V3** | Versao mais recente da linguagem de smart contracts do Cardano. Os scripts UVerify usam Plutus V3. |
 | **Preprod** | Testnet de producao do Cardano. Imita a mainnet mas usa tADA sem valor real. |
-| **ref_*_tx** | Campo em uma credencial DPP que aponta para o tx hash da credencial do ator anterior. |
-| **Serial** | Identificador unico do lote especifico. Nunca armazenado em texto claro on-chain. |
-| **SHA-256** | Algoritmo de hash criptografico. Usado para gerar data_hash e hash de seriais. |
 | **TransactionWitnessSet** | Conjunto de assinaturas (witnesses) de uma transacao Cardano em formato CBOR. |
 | **UTxO** | Unspent Transaction Output — modelo de contabilidade do Cardano. Cada output de transacao e um UTxO que pode ser gasto exatamente uma vez. |
+
+### DPP (Digital Product Passport)
+
+| Termo | Descricao |
+|-------|-----------|
+| **DPP** | Digital Product Passport (Passaporte Digital de Produto). |
+| **GTIN** | Global Trade Item Number — codigo unico que identifica o *tipo* do produto (equivalente ao codigo de barras EAN/UPC). |
+| **Serial** | Identificador unico do lote especifico. Nunca armazenado em texto claro on-chain. |
+| **data_hash** | `sha256(gtin + serial)` — impressao digital unica do produto. Usada como chave de busca no UVerify. |
+| **ref_*_tx** | Campo em uma credencial DPP que aponta para o tx hash da credencial do ator anterior. |
+| **SHA-256** | Algoritmo de hash criptografico. Usado para gerar data_hash e hash de seriais. |
+
+### UVerify
+
+| Termo | Descricao |
+|-------|-----------|
 | **UVerify** | Plataforma de certificacao on-chain para Cardano. Fornece smart contracts Plutus V3 para registrar e verificar credenciais. |
 | **UVerify SDK** | Biblioteca JavaScript (`@uverify/sdk`) para interagir com os smart contracts UVerify programaticamente. |
+
+### TypeScript / Ferramentas
+
+| Termo | Descricao |
+|-------|-----------|
+| **Deno** | Runtime TypeScript/JavaScript seguro. Nao precisa de `node_modules` e resolve dependencias por URL. |
 | **evolution-sdk** | Biblioteca (`@evolution-sdk/evolution`) para operacoes Cardano: carteiras, assinatura, construcao de transacoes. |
+| **Blockfrost** | Servico de infraestrutura que fornece API para acessar a blockchain Cardano sem rodar um no proprio. |

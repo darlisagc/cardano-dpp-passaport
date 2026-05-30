@@ -48,10 +48,10 @@ graph TB
         C4["Credencial: Reciclagem<br/>GTIN: 7891234560129"]
     end
 
-    MW -->|"50 ADA"| W1
-    MW -->|"50 ADA"| W2
-    MW -->|"50 ADA"| W3
-    MW -->|"50 ADA"| W4
+    MW -->|"ADA"| W1
+    MW -->|"ADA"| W2
+    MW -->|"ADA"| W3
+    MW -->|"ADA"| W4
 
     W1 --> C1
     W2 --> C2
@@ -353,6 +353,8 @@ deno task verify
 
 ### Padrao UVerify: anchor on-chain + dados off-chain
 
+> **Nota:** Existem dois padroes de ancoragem DPP em Cardano: (1) **metadata nativa** — payload completo gravado direto na transacao, legivel por qualquer indexador sem dependencia externa; e (2) **anchor + off-chain** — apenas o hash on-chain, payload completo no servidor UVerify. Esta implementacao usa exclusivamente o padrao anchor + off-chain via UVerify SDK, que oferece menor custo por transacao e maior controle de privacidade. Para mais detalhes sobre ambos os padroes, consulte o repositorio [cardano-dpp-standards](https://github.com/cardano-foundation/cardano-dpp-standards).
+
 O UVerify usa o padrao de **ancora on-chain** com dados armazenados off-chain:
 
 ```mermaid
@@ -413,17 +415,17 @@ Transacao Cardano
 
 ### Transacao de funding — anatomia
 
-A transacao de financiamento e mais simples (sem scripts):
+A transacao de financiamento e mais simples (sem scripts). O valor por ator e configuravel via parametro `adaPerWallet` (padrao: 50 ADA):
 
 ```
 Transacao Cardano (funding)
 ├── Inputs
 │   └── UTxO(s) da carteira principal
 ├── Outputs
-│   ├── 50 ADA → Ator 1 (origem)
-│   ├── 50 ADA → Ator 2 (celula)
-│   ├── 50 ADA → Ator 3 (pack)
-│   ├── 50 ADA → Ator 4 (reciclagem)
+│   ├── N ADA → Ator 1 (origem)
+│   ├── N ADA → Ator 2 (celula)
+│   ├── N ADA → Ator 3 (pack)
+│   ├── N ADA → Ator 4 (reciclagem)
 │   └── Troco → carteira principal
 └── Witnesses
     └── Assinatura da chave de pagamento da carteira principal
@@ -454,9 +456,7 @@ cardano-dpp-passaport/
     ├── transfer.ts              # Transferencia de ADA (funding)
     ├── issuer.ts                # Emissao via UVerify SDK
     ├── verify.ts                # Verificacao da cadeia
-    ├── main.ts                  # Orquestrador do pipeline
-    ├── simulate-students.ts     # Simulacao de 10 estudantes
-    └── verify-all-students.ts   # Verificacao em lote
+    └── main.ts                  # Orquestrador do pipeline
 ```
 
 ### Diagrama de dependencias entre modulos
@@ -504,12 +504,10 @@ graph TD
 | **`hash.ts`** | Core | Nenhuma (Web Crypto API nativa) | Tres funcoes puras: `dataHash(gtin, serial)` para fingerprint do produto, `hashSerial(serial)` para serial com privacidade, `mnemonicSuffix(mnemonic)` para sufixo unico de 6 hex chars. |
 | **`wallet.ts`** | Core | `@evolution-sdk/evolution` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via Client) e `signMessage` (via COSE direto). `createMainWalletClient()` cria Client para a carteira principal. |
 | **`payloads.ts`** | Dados | `./hash.ts` | Define payloads DPP para os 4 atores com GTINs fixos e seriais dinamicos (sufixo do mnemonico). Cada builder recebe `PayloadEnv` com sufixo e tx hashes anteriores. Retorna `{payload, serial, gtin}`. |
-| **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (50 ADA cada). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. |
+| **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (padrao: 50 ADA cada, configuravel via `adaPerWallet`). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. |
 | **`issuer.ts`** | Emissao | `@uverify/sdk` | `issueAllCredentials()` emite credenciais sequencialmente. Internamente: prepara colateral, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retry com backoff exponencial (8 tentativas, delay inicial 10s, max 60s). |
 | **`verify.ts`** | Verificacao | Nenhuma (fetch nativo) | `verifyChain()` busca credenciais por data_hash na API UVerify, classifica campos por prefixo, caminha a cadeia de referencias. Auto-detecta reciclagem. CLI: le `DATA_HASH_PACK` do .env. |
 | **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Entry point para `deno task run`. |
-| **`simulate-students.ts`** | Utilitario | Todos exceto verify | Simula 10 estudantes executando pipelines independentes. 10 ADA/wallet, 40 wallets total. |
-| **`verify-all-students.ts`** | Utilitario | `verify.ts`, `config.ts` | Verifica em lote as credenciais de 10 estudantes com data_hashes pre-definidos. |
 
 ### Dependencias npm/jsr
 
@@ -570,6 +568,8 @@ Imagine que cada etapa da fabricacao da bateria precisa ser "autenticada em cart
    - Referencia **todos os registros anteriores**
 
 O **verificador** e como alguem que vai ao cartorio e pede: "Me mostre o registro `tx_hash_pack`, e todos os registros que ele referencia." O cartorio (UVerify API) retorna a cadeia completa, verificavel e imutavel.
+
+> **Nota:** Nesta implementacao, todas as credenciais usam o metodo "cofre + protocolo" (anchor + off-chain via UVerify). Em outros cenarios, e possivel usar o metodo "carta registrada" (metadata nativa Cardano), onde o documento completo fica gravado direto na transacao — sem depender de nenhum servidor externo. Os dois metodos podem coexistir na mesma cadeia.
 
 ### A diferenca fundamental
 
