@@ -2,8 +2,6 @@
   "tasks": {
     "run": "deno run --allow-net --allow-env --allow-read --allow-write src/main.ts",
     "verify": "deno run --allow-net --allow-env --allow-read src/verify.ts",
-    "simulate": "deno run --allow-net --allow-env --allow-read --allow-write src/simulate-students.ts",
-    "verify-all": "deno run --allow-net --allow-env --allow-read src/verify-all-students.ts",
     "setup": "deno run --allow-net --allow-env --allow-read --allow-write src/cli/setup.ts",
     "issue-origem": "deno run --allow-net --allow-env --allow-read --allow-write src/cli/issue.ts origem",
     "issue-celula": "deno run --allow-net --allow-env --allow-read --allow-write src/cli/issue.ts celula",

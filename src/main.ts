@@ -12,9 +12,10 @@
 import { loadConfig } from "./config.ts";
 import { issueAllCredentials } from "./issuer.ts";
 import { buildPayloadEnv } from "./payloads.ts";
+import { appendToEnv } from "./state.ts";
 import { fundActorWallets, waitForConfirmation } from "./transfer.ts";
 import type { ActorName, ActorWallet, IssuanceResult, PipelineConfig } from "./types.ts";
-import { ACTOR_ORDER } from "./types.ts";
+import { ACTOR_ENV_KEY, ACTOR_ORDER } from "./types.ts";
 import { createActorWallet, generateMnemonic } from "./wallet.ts";
 
 /**
@@ -89,14 +90,29 @@ async function main(): Promise<void> {
     projectId: config.blockfrostProjectId,
   };
 
+  const ACTOR_NUMBERS: Record<ActorName, string> = {
+    origem: "1",
+    celula: "2",
+    pack: "3",
+    reciclagem: "4",
+  };
+
   const wallets = {} as Record<ActorName, ActorWallet>;
   for (const name of ACTOR_ORDER) {
     const mnemonic = generateMnemonic();
     const wallet = await createActorWallet(name, mnemonic, blockfrostConfig);
     wallets[name] = wallet;
-    console.log(`\n  ${name}:`);
+
+    const num = ACTOR_NUMBERS[name];
+
+    // Save mnemonic and address to .env
+    appendToEnv(`ATOR${num}_MNEMONIC`, mnemonic);
+    appendToEnv(`ATOR${num}_ADDRESS`, wallet.address);
+
+    console.log(`\n  ${name} (Ator ${num}):`);
     console.log(`    Address:  ${wallet.address}`);
-    console.log(`    Mnemonic: ${mnemonic}`);
+    console.log(`    Mnemonic: ${mnemonic.split(" ").slice(0, 3).join(" ")}...`);
+    console.log(`    Saved to .env: ATOR${num}_MNEMONIC, ATOR${num}_ADDRESS`);
   }
 
   // ── STEP 2: Fund actor wallets ──────────────────────────────────
@@ -104,6 +120,9 @@ async function main(): Promise<void> {
     config,
     ACTOR_ORDER.map((n) => wallets[n]),
   );
+
+  // Save funding tx hash to .env
+  appendToEnv("FUNDING_TX", fundingTxHash);
 
   // ── STEP 3: Wait for funding confirmation ───────────────────────
   await waitForConfirmation(config, fundingTxHash);
@@ -116,16 +135,25 @@ async function main(): Promise<void> {
   const env = await buildPayloadEnv(config.mainWalletMnemonic);
   const results = await issueAllCredentials(config, wallets, env);
 
-  // ── STEP 5: Print summary ───────────────────────────────────────
-  printSummary(results, wallets, fundingTxHash, config.uverifyApiUrl);
+  // ── STEP 5: Save results to .env ────────────────────────────────
+  for (const r of results) {
+    const num = ACTOR_NUMBERS[r.actor];
+    const txKey = ACTOR_ENV_KEY[r.actor];
+    appendToEnv(txKey, r.txHash);
+    appendToEnv(`DATA_HASH_ATOR${num}`, r.dataHash);
+  }
 
-  // Save key data to .env for verification later.
+  // Save TX_HASH_PACK and DATA_HASH_PACK (used by verify).
   const packResult = results.find((r) => r.actor === "pack");
   if (packResult) {
-    console.log("\nTo verify the chain later, add these to your .env:");
-    console.log(`  TX_HASH_PACK=${packResult.txHash}`);
-    console.log(`  DATA_HASH_PACK=${packResult.dataHash}`);
+    appendToEnv("TX_HASH_PACK", packResult.txHash);
+    appendToEnv("DATA_HASH_PACK", packResult.dataHash);
   }
+
+  console.log("\nAll results saved to .env");
+
+  // ── STEP 6: Print summary ───────────────────────────────────────
+  printSummary(results, wallets, fundingTxHash, config.uverifyApiUrl);
 }
 
 // Run the pipeline.
