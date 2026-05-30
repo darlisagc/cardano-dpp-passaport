@@ -42,7 +42,27 @@ Deno resolve as dependencias automaticamente na primeira execucao — nao precis
 
 Antes de emitir, certifique-se de ter tADA na carteira preprod cujo mnemonico esta em `WALLET_MNEMONIC`.
 
-### Pipeline completo (recomendado)
+### Passo a passo (recomendado para workshop)
+
+Emita cada credencial individualmente, entendendo cada etapa:
+
+```bash
+# 1. Setup (uma vez) — gera carteiras + financia
+deno task setup
+
+# 2. Emissao de credenciais (um por vez, nesta ordem)
+deno task issue-origem       # Ator 1 — sem dependencias
+deno task issue-celula       # Ator 2 — requer ATOR1_TX no .env
+deno task issue-pack         # Ator 3 — requer ATOR2_TX no .env
+deno task issue-reciclagem   # Ator 4 — requer ATOR1/2/3_TX no .env
+
+# 3. Verificacao
+deno task verify
+```
+
+Cada comando salva seu resultado no `.env` (mnemonicos, enderecos, tx hashes, data hashes). O proximo comando le de la automaticamente. Voce pode pausar entre os comandos e retomar mais tarde.
+
+### Pipeline completo (automatizado)
 
 ```bash
 deno task run
@@ -97,7 +117,11 @@ cardano-dpp-passaport/
     ├── transfer.ts        # Transferencia de ADA da carteira principal para os 4 atores
     ├── issuer.ts          # Logica de emissao via UVerify SDK (Plutus V3)
     ├── verify.ts          # Verificacao da cadeia de credenciais
-    └── main.ts            # Orquestrador do pipeline completo
+    ├── main.ts            # Orquestrador do pipeline completo
+    ├── state.ts           # Helpers para persistir estado no .env (appendToEnv, readEnvVar)
+    └── cli/
+        ├── setup.ts       # CLI: deno task setup (gera carteiras + financia)
+        └── issue.ts       # CLI: deno task issue-<ator> (emite credencial individual)
 ```
 
 ### O que cada arquivo faz
@@ -113,6 +137,9 @@ cardano-dpp-passaport/
 | `issuer.ts` | Emissao | Emite credenciais via UVerify SDK (`core.buildTransaction()` + `core.submitTransaction()`). Inclui preparacao de colateral para Plutus V3, retentativas com backoff exponencial (ate 8 tentativas), tratamento de UTxOs pendentes e espera por confirmacao on-chain. |
 | `verify.ts` | Verificacao | Verificador unificado. Busca credenciais pela API publica UVerify (`GET /api/v1/verify/{dataHash}`), classifica campos por prefixo (`ref_*`, `mat_*`), e percorre a cadeia de referencias ate a origem. Detecta automaticamente se a entrada e pack ou reciclagem. |
 | `main.ts` | Orquestrador | Executa o pipeline completo: carrega config → gera carteiras → transfere ADA → aguarda confirmacao → emite credenciais sequencialmente → imprime resumo com links Cexplorer e URLs de verificacao UVerify. |
+| `state.ts` | Core | Helpers para persistir estado no `.env`: `appendToEnv(key, value)` escreve/atualiza variaveis, `readEnvVar(key)` le variaveis. Usado pelos comandos CLI passo a passo. |
+| `cli/setup.ts` | CLI | Gera 4 carteiras de atores, salva mnemonicos e enderecos no `.env`, financia com tADA e aguarda confirmacao. Equivale aos Steps 0-3 do pipeline completo. |
+| `cli/issue.ts` | CLI | Emite a credencial de um unico ator. Aceita o nome do ator como argumento, le prerequisitos do `.env`, emite via UVerify SDK e salva tx hash e data hash no `.env`. |
 
 ## Dependencias
 

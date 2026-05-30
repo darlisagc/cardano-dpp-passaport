@@ -179,9 +179,49 @@ O serial nunca vai para o blockchain em texto claro — apenas o hash (`uv_url_s
 
 ## Secao 2 — Emitindo credenciais via TypeScript
 
-### Visao geral do pipeline
+### Opcao A: Passo a passo (recomendado para workshop)
 
-Esta implementacao TypeScript/Deno possui um pipeline **totalmente automatizado**. Um unico comando executa todo o fluxo:
+Para entender cada etapa da emissao, use os comandos individuais. Cada comando salva seu resultado no `.env`, e o proximo comando le de la:
+
+```bash
+# 1. Setup — gera carteiras e financia com tADA (executar uma vez)
+deno task setup
+# → gera 4 carteiras, salva mnemonicos e enderecos no .env
+# → transfere ADA para cada carteira e aguarda confirmacao
+
+# 2. Emissao de credenciais — um ator por vez
+deno task issue-origem
+# → emite credencial do Ator 1 (MineraLitio)
+# → salva ATOR1_TX e DATA_HASH_ATOR1 no .env
+
+deno task issue-celula
+# → le ATOR1_TX do .env (referencia ao ator anterior)
+# → emite credencial do Ator 2 (CellTech)
+# → salva ATOR2_TX e DATA_HASH_ATOR2 no .env
+
+deno task issue-pack
+# → le ATOR2_TX do .env
+# → emite credencial do Ator 3 (PackMontadora)
+# → salva ATOR3_TX, DATA_HASH_ATOR3, TX_HASH_PACK, DATA_HASH_PACK no .env
+
+deno task issue-reciclagem
+# → le ATOR1_TX, ATOR2_TX, ATOR3_TX do .env
+# → emite credencial do Ator 4 (RecicLar)
+# → salva ATOR4_TX e DATA_HASH_ATOR4 no .env
+
+# 3. Verificacao
+deno task verify
+# → le TX_HASH_PACK e DATA_HASH_PACK do .env
+# → percorre a cadeia: pack → celula → origem
+```
+
+**Por que passo a passo?** Cada ator representa uma empresa independente na cadeia de suprimentos. Emitir um por vez simula o cenario real: a *MineraLitio* emite primeiro, a *CellTech* so emite quando tem a referencia da origem, e assim por diante.
+
+> **Estado persistido:** O `.env` funciona como "banco de dados" entre os comandos. Cada `deno task issue-*` le os tx hashes dos atores anteriores e salva o seu proprio. Voce pode pausar entre os comandos, fechar o terminal, e retomar mais tarde.
+
+### Opcao B: Pipeline completo (automatizado)
+
+Se preferir executar tudo de uma vez (util para demos rapidas ou CI):
 
 ```bash
 deno task run

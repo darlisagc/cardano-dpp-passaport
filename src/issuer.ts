@@ -128,7 +128,7 @@ async function prepareCollateral(
  * Uses UVerify's core.buildTransaction() + core.submitTransaction()
  * for full control over the payload (including ref_*_tx fields).
  */
-async function issueCredential(
+export async function issueCredential(
   config: PipelineConfig,
   wallet: ActorWallet,
   env: PayloadEnv,
