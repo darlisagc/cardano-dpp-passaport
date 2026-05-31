@@ -10,6 +10,7 @@
  */
 
 import { loadConfig } from "./config.ts";
+import { issueAllCredentialsDireto } from "./issuer-direto.ts";
 import { issueAllCredentials } from "./issuer.ts";
 import { buildPayloadEnv } from "./payloads.ts";
 import { appendToEnv } from "./state.ts";
@@ -25,18 +26,14 @@ function printSummary(
   results: IssuanceResult[],
   wallets: Record<ActorName, ActorWallet>,
   fundingTxHash: string,
-  uverifyBaseUrl: string,
+  config: PipelineConfig,
 ): void {
-  // Convert API URL to the web app URL for verification links.
-  const appUrl = uverifyBaseUrl
-    .replace("api.preprod.", "app.preprod.")
-    .replace("/api/v1", "");
-
   console.log("\n" + "=".repeat(64));
   console.log("PIPELINE COMPLETE — Summary");
   console.log("=".repeat(64));
 
-  console.log(`\nFunding tx: ${fundingTxHash}`);
+  console.log(`\nEmission mode: ${config.emissionMode}`);
+  console.log(`Funding tx: ${fundingTxHash}`);
   console.log(
     `Cexplorer:  https://preprod.cexplorer.io/tx/${fundingTxHash}`,
   );
@@ -48,14 +45,29 @@ function printSummary(
   }
 
   console.log("\nIssued Credentials:");
-  for (const r of results) {
-    console.log(`\n  ${r.actor}:`);
-    console.log(`    tx_hash:   ${r.txHash}`);
-    console.log(`    data_hash: ${r.dataHash}`);
-    console.log(
-      `    Cexplorer: https://preprod.cexplorer.io/tx/${r.txHash}`,
-    );
-    console.log(`    Verify:    ${appUrl}/verify/${r.dataHash}`);
+  if (config.emissionMode === "metadata") {
+    for (const r of results) {
+      console.log(`\n  ${r.actor}:`);
+      console.log(`    tx_hash:   ${r.txHash}`);
+      console.log(`    data_hash: ${r.dataHash}`);
+      console.log(
+        `    Cexplorer: https://preprod.cexplorer.io/tx/${r.txHash}`,
+      );
+    }
+  } else {
+    // Convert API URL to the web app URL for verification links.
+    const appUrl = config.uverifyApiUrl
+      .replace("api.preprod.", "app.preprod.")
+      .replace("/api/v1", "");
+    for (const r of results) {
+      console.log(`\n  ${r.actor}:`);
+      console.log(`    tx_hash:   ${r.txHash}`);
+      console.log(`    data_hash: ${r.dataHash}`);
+      console.log(
+        `    Cexplorer: https://preprod.cexplorer.io/tx/${r.txHash}`,
+      );
+      console.log(`    Verify:    ${appUrl}/verify/${r.dataHash}`);
+    }
   }
 
   console.log("\n" + "=".repeat(64));
@@ -80,6 +92,7 @@ async function main(): Promise<void> {
   }
   console.log(`Blockfrost: ${config.blockfrostProjectId.slice(0, 12)}...`);
   console.log(`UVerify:    ${config.uverifyApiUrl}`);
+  console.log(`Mode:       ${config.emissionMode}`);
   console.log(`Mnemonic:   ${config.mainWalletMnemonic.split(" ").slice(0, 3).join(" ")}...`);
 
   // ── STEP 1: Generate 4 actor wallets ────────────────────────────
@@ -133,7 +146,9 @@ async function main(): Promise<void> {
 
   // ── STEP 4: Issue credentials sequentially ──────────────────────
   const env = await buildPayloadEnv(config.mainWalletMnemonic);
-  const results = await issueAllCredentials(config, wallets, env);
+  const results = config.emissionMode === "metadata"
+    ? await issueAllCredentialsDireto(config, wallets, env)
+    : await issueAllCredentials(config, wallets, env);
 
   // ── STEP 5: Save results to .env ────────────────────────────────
   for (const r of results) {
@@ -153,7 +168,7 @@ async function main(): Promise<void> {
   console.log("\nAll results saved to .env");
 
   // ── STEP 6: Print summary ───────────────────────────────────────
-  printSummary(results, wallets, fundingTxHash, config.uverifyApiUrl);
+  printSummary(results, wallets, fundingTxHash, config);
 }
 
 // Run the pipeline.

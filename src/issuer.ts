@@ -47,14 +47,62 @@ async function waitForUVerifyConfirmation(
 }
 
 /**
+ * Poll the collateral endpoint until the UTxO is confirmed available.
+ * Returns as soon as collateral is ready, or after timeoutMs (default 60s).
+ */
+async function waitForCollateralReady(
+  baseUrl: string,
+  address: string,
+  timeoutMs = 60_000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 5_000));
+    try {
+      const resp = await fetch(
+        `${baseUrl}/api/v1/transaction/prepare-collateral`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ senderAddress: address }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const status = data?.status?.message?.toUpperCase?.() ?? "";
+      if (status.includes("COLLATERAL_ALREADY_AVAILABLE")) {
+        console.log("  Collateral confirmed ready.");
+        return;
+      }
+      if (!data?.unsignedTransaction) {
+        // No tx needed — collateral exists
+        console.log("  Collateral ready (no action needed).");
+        return;
+      }
+    } catch {
+      // Network error — retry
+    }
+  }
+  console.log("  WARNING: Collateral readiness timeout — proceeding anyway.");
+}
+
+/**
  * Prepare collateral UTXO (>= 5 ADA) for Plutus V3 scripts.
+ *
+ * Uses a direct fetch for the collateral-specific endpoint (no SDK method),
+ * but delegates submission to the UVerify SDK's core.submitTransaction()
+ * for proper error handling and serialization.
  */
 async function prepareCollateral(
   baseUrl: string,
   address: string,
   signTx: (tx: string) => Promise<string>,
+  client?: InstanceType<typeof UVerifyClient>,
 ): Promise<void> {
   console.log("  [collateral] Checking collateral...");
+
+  // --- Step 1: Check / request collateral via the dedicated endpoint ---
   let resp: Response;
   try {
     resp = await fetch(`${baseUrl}/api/v1/transaction/prepare-collateral`, {
@@ -75,50 +123,70 @@ async function prepareCollateral(
     return;
   }
 
-  const data = await resp.json();
+  let data: Record<string, unknown>;
+  try {
+    data = await resp.json();
+  } catch {
+    console.log("  [collateral] Invalid JSON response — proceeding.");
+    return;
+  }
+
   const statusMsg: string =
-    data?.status?.message?.toUpperCase?.() ?? "";
+    (data?.status as Record<string, unknown>)?.message?.toString?.().toUpperCase?.() ?? "";
 
   if (statusMsg.includes("COLLATERAL_ALREADY_AVAILABLE")) {
     console.log("  [collateral] Already available.");
     return;
   }
 
-  const unsignedTx: string | undefined = data?.unsignedTransaction;
+  const unsignedTx: string | undefined = typeof data?.unsignedTransaction === "string"
+    ? data.unsignedTransaction as string
+    : undefined;
   if (!unsignedTx) {
     console.log("  [collateral] No action needed.");
     return;
   }
 
+  // --- Step 2: Sign & submit ---
   console.log("  [collateral] Creating collateral UTXO (5 ADA)...");
   const witnessSet = await signTx(unsignedTx);
-  // Submit collateral tx via the same endpoint pattern
-  const submitResp = await fetch(`${baseUrl}/api/v1/transaction/submit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      unsignedTransaction: unsignedTx,
-      witnessSet,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (submitResp.ok) {
-    const submitData = await submitResp.json();
-    const collateralTxHash = submitData?.txHash ?? submitData?.transactionHash;
-    console.log(
-      `  [collateral] Tx submitted: ${collateralTxHash?.slice(0, 16)}...`,
-    );
+
+  try {
+    let collateralTxHash: string | undefined;
+
+    if (client) {
+      // Use the SDK's submitTransaction for proper error handling.
+      collateralTxHash = await client.core.submitTransaction(
+        unsignedTx,
+        witnessSet,
+      );
+    } else {
+      // Fallback to raw fetch when no client is provided.
+      const submitResp = await fetch(`${baseUrl}/api/v1/transaction/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unsignedTransaction: unsignedTx, witnessSet }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (submitResp.ok) {
+        const submitData = await submitResp.json();
+        collateralTxHash = submitData?.txHash ?? submitData?.transactionHash;
+      }
+    }
+
     if (collateralTxHash) {
+      console.log(
+        `  [collateral] Tx submitted: ${collateralTxHash.slice(0, 16)}...`,
+      );
       await waitForUVerifyConfirmation(baseUrl, collateralTxHash);
       console.log("  [collateral] Confirmed.");
     } else {
-      // Tx submitted but no hash returned — wait for it to propagate.
-      console.log("  [collateral] Tx submitted (no hash returned), waiting 30s...");
-      await new Promise((r) => setTimeout(r, 30_000));
+      console.log("  [collateral] Tx submitted (no hash returned), polling for readiness...");
+      await waitForCollateralReady(baseUrl, address);
     }
-  } else {
-    console.log(`  [collateral] Submit failed (${submitResp.status}), waiting 15s...`);
-    await new Promise((r) => setTimeout(r, 15_000));
+  } catch (e) {
+    console.log(`  [collateral] Submit failed (${e}), polling for readiness...`);
+    await waitForCollateralReady(baseUrl, address);
   }
 }
 
@@ -150,12 +218,12 @@ export async function issueCredential(
     signMessage: wallet.signMessage,
   });
 
-  // 4. Prepare collateral for Plutus V3 scripts.
-  await prepareCollateral(config.uverifyApiUrl, wallet.address, wallet.signTx);
+  // 4. Prepare collateral for Plutus V3 scripts (pass client for SDK submission).
+  await prepareCollateral(config.uverifyApiUrl, wallet.address, wallet.signTx, client);
 
-  // Allow UTxOs to settle after collateral preparation.
-  console.log("  Waiting 20s for UTxOs to settle...");
-  await new Promise((r) => setTimeout(r, 20_000));
+  // Poll until collateral UTxO has settled.
+  console.log("  Polling for collateral readiness...");
+  await waitForCollateralReady(config.uverifyApiUrl, wallet.address);
 
   // 5. Issue with retry and exponential backoff.
   let lastError: Error | null = null;
@@ -183,8 +251,9 @@ export async function issueCredential(
           config.uverifyApiUrl,
           wallet.address,
           wallet.signTx,
+          client,
         );
-        await new Promise((r) => setTimeout(r, 10_000));
+        await waitForCollateralReady(config.uverifyApiUrl, wallet.address);
         continue;
       }
 
@@ -196,6 +265,11 @@ export async function issueCredential(
 
       // Sign the unsigned transaction.
       const unsignedTx = buildResult.unsignedTransaction;
+      if (!unsignedTx) {
+        throw new Error(
+          `buildTransaction returned no unsignedTransaction (status: ${buildResult.status?.message ?? "unknown"})`,
+        );
+      }
       const witnessSet = await wallet.signTx(unsignedTx);
 
       // Submit the signed transaction.

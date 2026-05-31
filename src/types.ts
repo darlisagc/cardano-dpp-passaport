@@ -5,6 +5,9 @@
 /** The four actors in the battery supply chain. */
 export type ActorName = "origem" | "celula" | "pack" | "reciclagem";
 
+/** Emission mode: UVerify smart contracts or direct native metadata. */
+export type EmissionMode = "uverify" | "metadata";
+
 /** Maps actor name to the .env variable that stores its tx hash. */
 export const ACTOR_ENV_KEY: Record<ActorName, string> = {
   origem: "ATOR1_TX",
@@ -30,6 +33,9 @@ export interface ActorWallet {
   signTx: (unsignedCborHex: string) => Promise<string>;
   /** CIP-8 message signing for UVerify state operations. */
   signMessage: (message: string) => Promise<{ key: string; signature: string }>;
+  /** Evolution SDK signing client for direct tx building (metadata mode). */
+  // deno-lint-ignore no-explicit-any
+  client: any;
 }
 
 /** Result of issuing one credential. */
@@ -45,6 +51,7 @@ export interface PipelineConfig {
   mainWalletMnemonic: string;
   uverifyApiUrl: string;
   blockfrostBaseUrl: string;
+  emissionMode: EmissionMode;
 }
 
 /** DPP payload: all values are strings (UVerify requirement). */

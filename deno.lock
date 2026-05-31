@@ -1,13 +1,24 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/dotenv@0.225": "0.225.7",
-    "npm:@evolution-sdk/evolution@0": "0.5.9_@effect+cluster@0.58.2__@effect+platform@0.96.1___effect@3.21.2__@effect+rpc@0.75.1___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+workflow@0.18.1___@effect+experimental@0.60.0____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___@effect+platform@0.96.1____effect@3.21.2___@effect+rpc@0.75.1____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___effect@3.21.2__effect@3.21.2__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2_@effect+experimental@0.60.0__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+rpc@0.75.1__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+workflow@0.18.1__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+platform@0.96.1___effect@3.21.2__@effect+rpc@0.75.1___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__effect@3.21.2",
-    "npm:@uverify/sdk@0": "0.1.8"
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "npm:@evolution-sdk/evolution@~0.5.9": "0.5.9_@effect+cluster@0.58.2__@effect+platform@0.96.1___effect@3.21.2__@effect+rpc@0.75.1___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+workflow@0.18.1___@effect+experimental@0.60.0____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___@effect+platform@0.96.1____effect@3.21.2___@effect+rpc@0.75.1____@effect+platform@0.96.1_____effect@3.21.2____effect@3.21.2___effect@3.21.2__effect@3.21.2__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2_@effect+experimental@0.60.0__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+rpc@0.75.1__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+platform@0.96.1___effect@3.21.2__effect@3.21.2_@effect+workflow@0.18.1__@effect+experimental@0.60.0___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__@effect+platform@0.96.1___effect@3.21.2__@effect+rpc@0.75.1___@effect+platform@0.96.1____effect@3.21.2___effect@3.21.2__effect@3.21.2",
+    "npm:@uverify/sdk@~0.1.8": "0.1.8"
   },
   "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
     "@std/dotenv@0.225.7": {
       "integrity": "11d8db03ca4ad5aba9eba809f2e8058b2a4f320b7b09fea4b360e162928329e3"
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
     }
   },
   "npm": {
@@ -365,9 +376,10 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/assert@1",
       "jsr:@std/dotenv@0.225",
-      "npm:@evolution-sdk/evolution@0",
-      "npm:@uverify/sdk@0"
+      "npm:@evolution-sdk/evolution@~0.5.9",
+      "npm:@uverify/sdk@~0.1.8"
     ]
   }
 }

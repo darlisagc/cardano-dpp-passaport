@@ -12,6 +12,7 @@
  */
 
 import { loadConfig } from "../config.ts";
+import { issueCredentialDireto } from "../issuer-direto.ts";
 import { issueCredential } from "../issuer.ts";
 import { buildPayloadEnv } from "../payloads.ts";
 import type { PayloadEnv } from "../payloads.ts";
@@ -131,7 +132,9 @@ async function main(): Promise<void> {
   if (ator3Tx) env.ator3Tx = ator3Tx;
 
   // ── Issue the credential ──────────────────────────────────────
-  const result = await issueCredential(config, wallet, env);
+  const result = config.emissionMode === "metadata"
+    ? await issueCredentialDireto(config, wallet, env)
+    : await issueCredential(config, wallet, env);
 
   // ── Save results to .env ──────────────────────────────────────
   const txKey = ACTOR_ENV_KEY[actor];
@@ -144,21 +147,21 @@ async function main(): Promise<void> {
     appendToEnv("DATA_HASH_PACK", result.dataHash);
   }
 
-  // Convert API URL to the web app URL for verification links.
-  const appUrl = config.uverifyApiUrl
-    .replace("api.preprod.", "app.preprod.")
-    .replace("/api/v1", "");
-
   // ── Print result ──────────────────────────────────────────────
   console.log("\n" + "=".repeat(64));
-  console.log(`CREDENTIAL ISSUED — ${actor} (Ator ${num})`);
+  console.log(`CREDENTIAL ISSUED — ${actor} (Ator ${num}) [${config.emissionMode}]`);
   console.log("=".repeat(64));
   console.log(`  tx_hash:   ${result.txHash}`);
   console.log(`  data_hash: ${result.dataHash}`);
   console.log(
     `  Cexplorer: https://preprod.cexplorer.io/tx/${result.txHash}`,
   );
-  console.log(`  Verify:    ${appUrl}/verify/${result.dataHash}`);
+  if (config.emissionMode === "uverify") {
+    const appUrl = config.uverifyApiUrl
+      .replace("api.preprod.", "app.preprod.")
+      .replace("/api/v1", "");
+    console.log(`  Verify:    ${appUrl}/verify/${result.dataHash}`);
+  }
   console.log(`\n  Saved to .env: ${txKey}=${result.txHash}`);
   console.log(`  Saved to .env: DATA_HASH_ATOR${num}=${result.dataHash}`);
   if (actor === "pack") {

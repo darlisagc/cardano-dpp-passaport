@@ -3,7 +3,7 @@
  */
 
 import "@std/dotenv/load";
-import type { PipelineConfig } from "./types.ts";
+import type { EmissionMode, PipelineConfig } from "./types.ts";
 
 export function loadConfig(): PipelineConfig {
   const blockfrostProjectId = Deno.env.get("BLOCKFROST_PROJECT_ID")?.trim();
@@ -34,10 +34,19 @@ export function loadConfig(): PipelineConfig {
 
   const blockfrostBaseUrl = "https://cardano-preprod.blockfrost.io/api/v0";
 
+  const rawMode = Deno.env.get("EMISSION_MODE")?.trim().toLowerCase() || "uverify";
+  if (rawMode !== "uverify" && rawMode !== "metadata") {
+    throw new Error(
+      `EMISSION_MODE must be "uverify" or "metadata", got "${rawMode}"`,
+    );
+  }
+  const emissionMode: EmissionMode = rawMode;
+
   return {
     blockfrostProjectId,
     mainWalletMnemonic,
     uverifyApiUrl,
     blockfrostBaseUrl,
+    emissionMode,
   };
 }

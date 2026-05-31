@@ -2,13 +2,17 @@
  * Chain verification — verifies each credential and walks the chain
  * backward from pack (or reciclagem) to origin.
  *
- * Uses the UVerify public API (GET /api/v1/verify/{dataHash}) to
- * look up credentials by their data_hash.
+ * Supports two verification paths:
+ *   1. UVerify API (GET /api/v1/verify/{dataHash}) — for uverify-issued credentials
+ *   2. Blockfrost metadata (GET /txs/{txHash}/metadata) — for direct metadata credentials
+ *
+ * When a tx_hash is known, Blockfrost metadata is tried first (works for
+ * both modes), falling back to UVerify API.
  */
 
 import type { PipelineConfig } from "./types.ts";
 
-/** Credential data extracted from UVerify verification response. */
+/** Credential data extracted from verification response. */
 interface VerifiedCredential {
   name?: string;
   issuer?: string;
@@ -50,6 +54,91 @@ function classifyFields(
   }
 
   return { references, dataHashes, materials };
+}
+
+/**
+ * Convert a Blockfrost metadata value (which may be a string or array of
+ * strings for chunked values) back to a plain string.
+ */
+function metadatumToString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(metadatumToString).join("");
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  return String(value);
+}
+
+/**
+ * Parse a Blockfrost metadata JSON object (from /txs/{hash}/metadata)
+ * into a flat Record<string, string>.
+ *
+ * Blockfrost returns metadata as:
+ *   [{ label: "1990", json_metadata: { key: value, ... } }]
+ *
+ * For TransactionMetadatum Maps, json_metadata is an object where keys
+ * are strings and values are strings or arrays (chunked text).
+ */
+function parseBlockfrostMetadata(
+  metadataArray: Array<{ label: string; json_metadata: unknown }>,
+): Record<string, string> | null {
+  // Find our label (1990)
+  const entry = metadataArray.find((m) => m.label === "1990");
+  if (!entry || !entry.json_metadata) return null;
+
+  const jsonMeta = entry.json_metadata;
+  if (typeof jsonMeta !== "object" || jsonMeta === null) return null;
+
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(jsonMeta as Record<string, unknown>)) {
+    result[key] = metadatumToString(value);
+  }
+  return result;
+}
+
+/**
+ * Verify a credential by fetching native metadata from Blockfrost.
+ * Works for direct-metadata-issued credentials (label 1990).
+ */
+async function verifyByBlockfrostMetadata(
+  config: PipelineConfig,
+  txHash: string,
+): Promise<VerifiedCredential | null> {
+  try {
+    const resp = await fetch(
+      `${config.blockfrostBaseUrl}/txs/${txHash}/metadata`,
+      {
+        headers: { project_id: config.blockfrostProjectId },
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+
+    if (!resp.ok) return null;
+
+    const metadataArray = await resp.json();
+    if (!Array.isArray(metadataArray) || metadataArray.length === 0) {
+      return null;
+    }
+
+    const meta = parseBlockfrostMetadata(metadataArray);
+    if (!meta) return null;
+
+    const { references, dataHashes, materials } = classifyFields(meta);
+
+    return {
+      name: meta.name,
+      issuer: meta.issuer,
+      gtin: meta.gtin,
+      origin: meta.origin,
+      manufactured: meta.manufactured,
+      carbonFootprint: meta.carbon_footprint,
+      recycledContent: meta.recycled_content,
+      materials,
+      references,
+      dataHashes,
+      txHash,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -114,6 +203,43 @@ async function verifyByDataHash(
 }
 
 /**
+ * Look up a credential using dual-path verification.
+ *
+ * When a tx_hash is available, tries Blockfrost native metadata first
+ * (works for both direct-metadata and UVerify-issued credentials that
+ * happen to have label 1990). Falls back to UVerify API.
+ */
+async function verifyCredential(
+  config: PipelineConfig,
+  dHash?: string,
+  txHash?: string,
+): Promise<VerifiedCredential> {
+  // Try Blockfrost metadata first when we have a tx_hash.
+  if (txHash) {
+    const bfResult = await verifyByBlockfrostMetadata(config, txHash);
+    if (bfResult) {
+      console.log("  (verified via Blockfrost metadata)");
+      return bfResult;
+    }
+  }
+
+  // Fall back to UVerify API (requires data_hash).
+  if (dHash) {
+    const uvResult = await verifyByDataHash(
+      config.uverifyApiUrl,
+      dHash,
+      txHash,
+    );
+    console.log("  (verified via UVerify API)");
+    return uvResult;
+  }
+
+  throw new Error(
+    "Cannot verify: need at least a data_hash or tx_hash",
+  );
+}
+
+/**
  * Print a verified credential summary.
  */
 function printCredential(label: string, cred: VerifiedCredential): void {
@@ -143,22 +269,25 @@ function printCredential(label: string, cred: VerifiedCredential): void {
  * Walks backward: entry → pack → celula → origem
  * If the entry credential has ref_pack_tx, it's a reciclagem credential
  * and we follow it to the pack first.
+ *
+ * Uses dual-path verification: Blockfrost metadata first, UVerify API fallback.
  */
 export async function verifyChain(
   config: PipelineConfig,
   entryDataHash: string,
   entryTxHash?: string,
 ): Promise<void> {
-  const baseUrl = config.uverifyApiUrl;
-
-  console.log("=" .repeat(64));
+  console.log("=".repeat(64));
   console.log("DPP Chain Verification");
-  console.log("=" .repeat(64));
+  console.log("=".repeat(64));
   console.log(`\nEntry data_hash: ${entryDataHash}`);
+  if (entryTxHash) {
+    console.log(`Entry tx_hash:   ${entryTxHash}`);
+  }
 
   // Step 1: Look up the entry credential.
   console.log("\n[1/?] Looking up entry credential...");
-  const entry = await verifyByDataHash(baseUrl, entryDataHash, entryTxHash);
+  const entry = await verifyCredential(config, entryDataHash, entryTxHash);
   printCredential("Entry", entry);
 
   // Auto-detect: reciclagem has ref_pack_tx
@@ -167,10 +296,15 @@ export async function verifyChain(
 
   if (entry.references["pack_tx"]) {
     credReciclagem = entry;
-    const packTx = entry.references["pack_tx"]!;
+    const packTx = entry.references["pack_tx"];
     const packDh = entry.dataHashes["pack_data_hash"];
+    if (!packDh) {
+      throw new Error(
+        "Broken chain: reciclagem credential has ref_pack_tx but is missing ref_pack_data_hash",
+      );
+    }
     console.log("\n[2/5] Detected reciclagem — following to pack...");
-    credPack = await verifyByDataHash(baseUrl, packDh!, packTx);
+    credPack = await verifyCredential(config, packDh, packTx);
     printCredential("Pack", credPack);
   } else {
     credPack = entry;
@@ -185,8 +319,8 @@ export async function verifyChain(
   let credCelula: VerifiedCredential | undefined;
   const celulaTx = credPack.references["celula_tx"];
   const celulaDh = credPack.dataHashes["celula_data_hash"];
-  if (celulaTx && celulaDh) {
-    credCelula = await verifyByDataHash(baseUrl, celulaDh, celulaTx);
+  if (celulaTx || celulaDh) {
+    credCelula = await verifyCredential(config, celulaDh, celulaTx);
     printCredential("Celula", credCelula);
   } else {
     console.log("  WARNING: Pack does not reference a celula credential.");
@@ -199,8 +333,8 @@ export async function verifyChain(
   if (credCelula) {
     const origemTx = credCelula.references["origem_tx"];
     const origemDh = credCelula.dataHashes["origem_data_hash"];
-    if (origemTx && origemDh) {
-      credOrigem = await verifyByDataHash(baseUrl, origemDh, origemTx);
+    if (origemTx || origemDh) {
+      credOrigem = await verifyCredential(config, origemDh, origemTx);
       printCredential("Origem", credOrigem);
     } else {
       console.log(

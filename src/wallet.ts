@@ -99,7 +99,7 @@ export async function createActorWallet(
     };
   };
 
-  return { name, mnemonic, address: addressBech32, signTx, signMessage };
+  return { name, mnemonic, address: addressBech32, signTx, signMessage, client };
 }
 
 /**
