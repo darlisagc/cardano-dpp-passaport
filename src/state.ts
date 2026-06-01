@@ -36,6 +36,26 @@ export function readEnvVar(key: string): string | undefined {
 }
 
 /**
+ * Append a comment line to the .env file.
+ */
+export function appendCommentToEnv(comment: string): void {
+  let content: string;
+  try {
+    content = Deno.readTextFileSync(ENV_PATH);
+  } catch {
+    Deno.writeTextFileSync(ENV_PATH, `# ${comment}\n`);
+    return;
+  }
+
+  // Ensure there's a newline before appending.
+  if (!content.endsWith("\n")) {
+    content += "\n";
+  }
+  content += `\n# ${comment}\n`;
+  Deno.writeTextFileSync(ENV_PATH, content);
+}
+
+/**
  * Append or update a key=value pair in the .env file.
  *
  * If the key already exists, its value is replaced in-place.

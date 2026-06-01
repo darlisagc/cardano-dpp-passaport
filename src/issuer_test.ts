@@ -142,21 +142,19 @@ Deno.test("issueCredential: PENDING_TRANSACTION status is detected", () => {
   assertEquals(statusMsg.includes("PENDING"), true);
 });
 
-Deno.test("exponential backoff caps at 60s", () => {
-  const INITIAL_DELAY_MS = 10_000;
-  const MAX_ATTEMPTS = 8;
+Deno.test("exponential backoff starts at 40s and keeps increasing", () => {
+  const INITIAL_DELAY_MS = 40_000;
+  const MAX_ATTEMPTS = 5;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, attempt - 1), 60_000);
-    if (attempt <= 3) {
-      // 10s, 20s, 40s
-      assertEquals(delay < 60_000, true);
-    }
-    // Always capped
-    assertEquals(delay <= 60_000, true);
+  const expectedDelays = [40_000, 80_000, 160_000, 320_000];
+
+  for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+    const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+    assertEquals(delay, expectedDelays[attempt - 1]);
   }
 
-  // At attempt 4: 10000 * 8 = 80000 -> capped at 60000
-  const delay4 = Math.min(INITIAL_DELAY_MS * Math.pow(2, 3), 60_000);
-  assertEquals(delay4, 60_000);
+  // Each delay is strictly greater than the previous (no cap)
+  for (let i = 1; i < expectedDelays.length; i++) {
+    assertEquals(expectedDelays[i]! > expectedDelays[i - 1]!, true);
+  }
 });

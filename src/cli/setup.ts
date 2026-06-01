@@ -13,7 +13,7 @@
  */
 
 import { loadConfig } from "../config.ts";
-import { appendToEnv } from "../state.ts";
+import { appendCommentToEnv, appendToEnv } from "../state.ts";
 import { fundActorWallets, waitForConfirmation } from "../transfer.ts";
 import type { ActorName, ActorWallet, PipelineConfig } from "../types.ts";
 import { ACTOR_ORDER } from "../types.ts";
@@ -56,6 +56,13 @@ async function main(): Promise<void> {
     reciclagem: "4",
   };
 
+  const ACTOR_DESCRIPTIONS: Record<ActorName, string> = {
+    origem: "Ator 1 — Origem (MineraLitio Jequitinhonha)",
+    celula: "Ator 2 — Celula (CellTech Brasil)",
+    pack: "Ator 3 — Pack (PackMontadora SP)",
+    reciclagem: "Ator 4 — Reciclagem (RecicLar Sorocaba)",
+  };
+
   const wallets = {} as Record<ActorName, ActorWallet>;
   for (const name of ACTOR_ORDER) {
     const mnemonic = generateMnemonic();
@@ -64,7 +71,8 @@ async function main(): Promise<void> {
 
     const num = ACTOR_ENV_NUMBERS[name];
 
-    // Save mnemonic and address to .env
+    // Save mnemonic and address to .env with actor description
+    appendCommentToEnv(ACTOR_DESCRIPTIONS[name]);
     appendToEnv(`ATOR${num}_MNEMONIC`, mnemonic);
     appendToEnv(`ATOR${num}_ADDRESS`, wallet.address);
 
