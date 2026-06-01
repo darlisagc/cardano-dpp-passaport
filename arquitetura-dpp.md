@@ -127,29 +127,53 @@ sequenceDiagram
     participant P as Pipeline (main.ts)
     participant W as ActorWallet
     participant U as UVerify API
-    participant C as Cardano (preprod)
+    participant C as Cardano Node (preprod)
+
+    Note over P,C: FASE 1 — Preparacao de colateral
 
     P->>W: createActorWallet(name, mnemonic)
-    P->>U: POST /prepare-collateral
-    U-->>P: unsignedTx (ou "already available")
-    P->>W: signTx(unsignedTx)
-    W-->>P: witnessSet
-    P->>U: POST /submit (colateral)
-    U->>C: Submit colateral tx
-    C-->>U: Confirmacao
+    P->>U: POST /prepare-collateral {senderAddress}
+    alt Colateral ja existe
+        U-->>P: COLLATERAL_ALREADY_AVAILABLE
+    else Precisa criar
+        U-->>P: unsignedTx (tx que separa 5 ADA como colateral)
+        P->>W: signTx(unsignedTx)
+        W-->>P: witnessSet (CBOR-hex)
+        P->>U: core.submitTransaction(unsignedTx, witnessSet)
+        U->>C: Submete tx de colateral
+        C-->>U: tx incluida no bloco
+        U-->>P: txHash do colateral
+        Note over P: Aguarda confirmacao on-chain (polling)
+    end
 
-    Note over P: Aguarda UTxOs assentarem
+    Note over P,C: FASE 2 — Construcao da transacao de credencial
 
-    P->>U: core.buildTransaction({hash, metadata})
-    U-->>P: unsignedTransaction
+    P->>U: core.buildTransaction({hash, metadata, address})
+
+    Note over U: UVerify API constroi a transacao:<br/>1. Seleciona UTxOs do ator (inputs)<br/>2. Cria output para o script address UVerify (min UTxO)<br/>3. Referencia o Plutus V3 validator (reference script)<br/>4. Inclui redeemer com data_hash + algoritmo SHA-256<br/>5. Reserva UTxO de colateral (5 ADA)<br/>6. Calcula troco → output de volta para o ator<br/>7. Armazena payload off-chain indexado por data_hash
+
+    U-->>P: unsignedTransaction (CBOR-hex)
+
+    Note over P,C: FASE 3 — Assinatura e submissao
+
     P->>W: signTx(unsignedTransaction)
+    Note over W: Decodifica CBOR → assina com<br/>chave de pagamento do ator<br/>→ TransactionWitnessSet
     W-->>P: witnessSet (CBOR-hex)
+
     P->>U: core.submitTransaction(unsignedTx, witnessSet)
-    U->>C: Submit credential tx
-    C-->>U: txHash
+    Note over U: Monta tx final:<br/>unsignedTx + witnessSet → tx assinada
+
+    U->>C: Submete tx assinada via Blockfrost/submit
+    Note over C: Cardano Node valida a tx:<br/>1. Verifica assinatura do ator (witness)<br/>2. Executa script Plutus V3 do UVerify<br/>3. Valida redeemer (data_hash, algoritmo)<br/>4. Verifica colateral disponivel<br/>5. Consome inputs, cria outputs<br/>6. Inclui tx no proximo bloco
+
+    C-->>U: txHash (tx confirmada no bloco)
     U-->>P: txHash
 
-    Note over P: Aguarda confirmacao on-chain
+    Note over P,C: FASE 4 — Confirmacao
+
+    P->>U: GET /transaction/confirm/{txHash}
+    Note over P: Polling ate tx aparecer on-chain (timeout 90s)
+    U-->>P: Confirmado
 ```
 
 ### Componentes do fluxo de emissao
