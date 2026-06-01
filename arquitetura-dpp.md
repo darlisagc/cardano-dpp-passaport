@@ -287,25 +287,43 @@ sequenceDiagram
     participant B as Blockfrost API
     participant U as UVerify API
 
-    Note over V: 1. Busca credencial do Pack
+    Note over V: 1. Busca credencial de entrada (pack ou reciclagem)
 
-    V->>B: GET /txs/{txHash_pack}/metadata
+    V->>B: GET /txs/{txHash_entry}/metadata
     alt Metadata label 1990 encontrado (modo metadata)
         B-->>V: [{label: "1990", json_metadata: {...}}]
     else Nao encontrado (modo uverify)
         B-->>V: 404
-        V->>U: GET /api/v1/verify/{dataHash_pack}
+        V->>U: GET /api/v1/verify/{dataHash_entry}
         U-->>V: [{metadata, transactionHash, ...}]
     end
 
-    Note over V: Extrai ref_celula_tx e ref_celula_data_hash
+    Note over V: Auto-detecta: tem ref_pack_tx?
 
-    Note over V: 2. Busca credencial da Celula
+    alt Entrada e Reciclagem (tem ref_pack_tx)
+        Note over V: 2. Segue referencia para o Pack
+
+        V->>B: GET /txs/{txHash_pack}/metadata
+        alt Metadata label 1990 encontrado
+            B-->>V: [{label: "1990", json_metadata: {...}}]
+        else Nao encontrado
+            B-->>V: 404
+            V->>U: GET /api/v1/verify/{dataHash_pack}
+            U-->>V: [{metadata, transactionHash, ...}]
+        end
+
+        Note over V: Extrai ref_celula_tx e ref_celula_data_hash
+    else Entrada e Pack (sem ref_pack_tx)
+        Note over V: Entrada ja e o Pack — continua
+        Note over V: Extrai ref_celula_tx e ref_celula_data_hash
+    end
+
+    Note over V: 3. Segue referencia para a Celula
 
     V->>B: GET /txs/{txHash_celula}/metadata
-    alt Metadata label 1990 encontrado (modo metadata)
+    alt Metadata label 1990 encontrado
         B-->>V: [{label: "1990", json_metadata: {...}}]
-    else Nao encontrado (modo uverify)
+    else Nao encontrado
         B-->>V: 404
         V->>U: GET /api/v1/verify/{dataHash_celula}
         U-->>V: [{metadata, transactionHash, ...}]
@@ -313,18 +331,18 @@ sequenceDiagram
 
     Note over V: Extrai ref_origem_tx e ref_origem_data_hash
 
-    Note over V: 3. Busca credencial da Origem
+    Note over V: 4. Segue referencia para a Origem
 
     V->>B: GET /txs/{txHash_origem}/metadata
-    alt Metadata label 1990 encontrado (modo metadata)
+    alt Metadata label 1990 encontrado
         B-->>V: [{label: "1990", json_metadata: {...}}]
-    else Nao encontrado (modo uverify)
+    else Nao encontrado
         B-->>V: 404
         V->>U: GET /api/v1/verify/{dataHash_origem}
         U-->>V: [{metadata, transactionHash, ...}]
     end
 
-    Note over V: 4. Imprime resumo: VERIFIED / MISSING para cada etapa
+    Note over V: 5. Resumo: VERIFIED / MISSING para cada etapa da cadeia
 ```
 
 ### Algoritmo de caminhada na cadeia
