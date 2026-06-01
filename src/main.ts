@@ -20,7 +20,11 @@ import { ACTOR_ENV_KEY, ACTOR_ORDER } from "./types.ts";
 import { createActorWallet, generateMnemonic } from "./wallet.ts";
 
 /**
- * Print the final pipeline summary.
+ * Print the final pipeline summary to the console.
+ *
+ * Displays the emission mode, funding tx with Cexplorer link, all actor
+ * wallet addresses, and each issued credential (tx_hash, data_hash,
+ * Cexplorer link). For UVerify mode, also prints the UVerify verify URL.
  */
 function printSummary(
   results: IssuanceResult[],
@@ -74,7 +78,18 @@ function printSummary(
 }
 
 /**
- * Main pipeline entry point.
+ * Main pipeline entry point — runs the full DPP supply chain flow.
+ *
+ * Executes 6 steps sequentially:
+ *   Step 0: Load and validate .env configuration (Blockfrost key, mnemonic, emission mode)
+ *   Step 1: Generate 4 actor wallets (BIP-39 mnemonics + Enterprise addresses)
+ *   Step 2: Fund all 4 wallets in a single tx (4 x 50 ADA = 200 ADA)
+ *   Step 3: Wait for funding confirmation + 15s UTxO propagation buffer
+ *   Step 4: Issue credentials sequentially (origem → celula → pack → reciclagem)
+ *           Mode selected by EMISSION_MODE: "uverify" uses issuer.ts, "metadata" uses issuer-direto.ts
+ *   Step 5: Save all results to .env and print summary with Cexplorer links
+ *
+ * Entry point for `deno task run` (uverify) and `deno task run-metadata` (metadata).
  */
 async function main(): Promise<void> {
   // ── STEP 0: Load configuration ──────────────────────────────────

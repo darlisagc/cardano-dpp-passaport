@@ -57,6 +57,21 @@ function usage(): never {
   Deno.exit(1);
 }
 
+/**
+ * Main issue entry point.
+ *
+ * Parses the actor name from CLI args, loads config, checks prerequisites
+ * (previous actors must be issued first), recreates the actor's wallet from
+ * the stored mnemonic, builds the DPP payload, and issues the credential.
+ *
+ * Emission mode is determined by EMISSION_MODE in .env (or env var override):
+ *   - "uverify" (default): issues via UVerify SDK + Plutus V3 smart contracts
+ *   - "metadata": issues via native Cardano metadata (label 1990)
+ *
+ * Results (tx_hash, data_hash) are saved to .env for the next step.
+ * For the pack actor, also saves TX_HASH_PACK and DATA_HASH_PACK
+ * which are used by `deno task verify`.
+ */
 async function main(): Promise<void> {
   // ── Parse actor name from CLI args ────────────────────────────
   const actorArg = Deno.args[0]?.trim().toLowerCase();

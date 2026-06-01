@@ -36,7 +36,14 @@ const INITIAL_DELAY_MS = 10_000;
 
 /**
  * Split a string into chunks that fit within the 64-byte metadata text limit.
- * Cardano metadata text fields are limited to 64 bytes.
+ *
+ * Cardano native metadata text fields are limited to 64 bytes per the
+ * ledger spec. Values longer than 64 bytes (e.g. long issuer names,
+ * data hashes) must be split into an array of chunks. The verifier
+ * reassembles them by joining the array elements.
+ *
+ * Uses a byte-aware approach: trims from the end character by character
+ * until the UTF-8 encoded slice fits within 64 bytes.
  */
 function chunkString(value: string): string[] {
   const encoder = new TextEncoder();
@@ -87,6 +94,10 @@ function payloadToMetadatum(
 
 /**
  * Wait for a transaction to be confirmed on-chain via Blockfrost.
+ *
+ * Polls GET /txs/{txHash} every 5 seconds until Blockfrost returns
+ * HTTP 200 (tx is on-chain) or the timeout expires (default 90s).
+ * Used for metadata-mode transactions which don't go through UVerify.
  */
 async function waitForBlockfrostConfirmation(
   config: PipelineConfig,
@@ -199,8 +210,13 @@ export async function issueCredentialDireto(
 /**
  * Issue credentials for all 4 actors sequentially using direct metadata.
  *
+ * Issuance order: origem → celula → pack → reciclagem.
  * Same sequential dependency as issueAllCredentials in issuer.ts:
- * each actor references the previous actor's txHash.
+ * each actor references the previous actor's txHash (ref_*_tx fields),
+ * so parallel issuance is not possible. The PayloadEnv is updated after
+ * each issuance with the resulting txHash so the next actor can reference it.
+ *
+ * Used by main.ts when EMISSION_MODE=metadata.
  */
 export async function issueAllCredentialsDireto(
   config: PipelineConfig,

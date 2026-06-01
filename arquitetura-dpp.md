@@ -7,7 +7,7 @@
 ## Indice
 
 - [1. Cadeia de suprimentos](#1-cadeia-de-suprimentos)
-- [2. Emissao via UVerify SDK](#2-emissao-via-uverify-sdk)
+- [2. Emissao de credenciais](#2-emissao-de-credenciais)
 - [3. Fluxo do verificador](#3-fluxo-do-verificador)
 - [4. Estrutura on-chain](#4-estrutura-on-chain)
 - [5. Mapa de arquivos](#5-mapa-de-arquivos)
@@ -116,11 +116,16 @@ export async function mnemonicSuffix(mnemonic: string): Promise<string> {
 
 ---
 
-## 2. Emissao via UVerify SDK
+## 2. Emissao de credenciais
 
-### Arquitetura de emissao
+O projeto suporta dois modos de emissao, selecionaveis via `EMISSION_MODE` no `.env`:
 
-A emissao usa o **UVerify SDK** (`@uverify/sdk`) com o fluxo `core.buildTransaction()` + `core.submitTransaction()`. Este fluxo de baixo nivel da controle total sobre os campos de metadados, permitindo incluir os campos customizados `ref_*_tx`.
+- **UVerify** (`EMISSION_MODE=uverify`, padrao): usa smart contracts Plutus V3 via UVerify SDK. Os dados ficam off-chain na API UVerify, ancorados por hash on-chain.
+- **Metadata** (`EMISSION_MODE=metadata`): grava o payload DPP inteiro como metadado nativo Cardano (label 1990) diretamente na transacao. Sem smart contracts, paga somente a taxa de rede.
+
+### Arquitetura de emissao (modo UVerify)
+
+A emissao via UVerify usa o SDK (`@uverify/sdk`) com o fluxo `core.buildTransaction()` + `core.submitTransaction()`. Este fluxo de baixo nivel da controle total sobre os campos de metadados, permitindo incluir os campos customizados `ref_*_tx`.
 
 ```mermaid
 sequenceDiagram
@@ -377,7 +382,7 @@ ENTRADA: data_hash (do pack ou reciclagem) + tx_hash (opcional)
 if (entry.references["pack_tx"]) {
   // Entrada e reciclagem — segue para pack primeiro
   credReciclagem = entry;
-  credPack = await verifyByDataHash(baseUrl, packDh, packTx);
+  credPack = await verifyCredential(config, packDh, packTx);
 } else {
   // Entrada e pack — inicia a cadeia aqui
   credPack = entry;
@@ -401,7 +406,7 @@ deno task verify
 
 ### Padrao UVerify: anchor on-chain + dados off-chain
 
-> **Nota:** Existem dois padroes de ancoragem DPP em Cardano: (1) **metadata nativa** — payload completo gravado direto na transacao, legivel por qualquer indexador sem dependencia externa; e (2) **anchor + off-chain** — apenas o hash on-chain, payload completo no servidor UVerify. Esta implementacao usa exclusivamente o padrao anchor + off-chain via UVerify SDK, que oferece menor custo por transacao e maior controle de privacidade. Para mais detalhes sobre ambos os padroes, consulte o repositorio [cardano-dpp-standards](https://github.com/cardano-foundation/cardano-dpp-standards).
+> **Nota:** Existem dois padroes de ancoragem DPP em Cardano: (1) **metadata nativa** — payload completo gravado direto na transacao (label 1990), legivel por qualquer indexador sem dependencia externa; e (2) **anchor + off-chain** — apenas o hash on-chain, payload completo no servidor UVerify. Esta implementacao suporta **ambos os padroes**, selecionaveis via `EMISSION_MODE`: `metadata` para metadados nativos (issuer-direto.ts) e `uverify` para anchor + off-chain via UVerify SDK (issuer.ts). O verificador (verify.ts) funciona para ambos os modos usando verificacao dual-path. Para mais detalhes sobre os padroes, consulte o repositorio [cardano-dpp-standards](https://github.com/cardano-foundation/cardano-dpp-standards).
 
 O UVerify usa o padrao de **ancora on-chain** com dados armazenados off-chain:
 
@@ -547,15 +552,16 @@ graph TD
 
 | Arquivo | Camada | Dependencias externas | Responsabilidade |
 |---------|--------|----------------------|------------------|
-| **`types.ts`** | Dados | Nenhuma | Define `ActorName`, `ActorWallet`, `IssuanceResult`, `PipelineConfig`, `DppPayload`, `PayloadResult`. Sem logica, apenas tipos e constantes (`ACTOR_ORDER`, `ACTOR_ENV_KEY`). |
-| **`config.ts`** | Infraestrutura | `@std/dotenv` | Carrega `.env`, valida `BLOCKFROST_PROJECT_ID` (nao pode ser placeholder) e `WALLET_MNEMONIC` (deve ter 24 palavras). Retorna `PipelineConfig` tipado. |
+| **`types.ts`** | Dados | Nenhuma | Define `ActorName`, `EmissionMode`, `ActorWallet`, `IssuanceResult`, `PipelineConfig`, `DppPayload`, `PayloadResult`. Sem logica, apenas tipos e constantes (`ACTOR_ORDER`, `ACTOR_ENV_KEY`). |
+| **`config.ts`** | Infraestrutura | `@std/dotenv` | Carrega `.env`, valida `BLOCKFROST_PROJECT_ID` (rejeita placeholder e chaves mainnet) e `WALLET_MNEMONIC` (deve ter 24 palavras). Valida `EMISSION_MODE` ("uverify" ou "metadata"). Retorna `PipelineConfig` tipado. |
 | **`hash.ts`** | Core | Nenhuma (Web Crypto API nativa) | Tres funcoes puras: `dataHash(gtin, serial)` para fingerprint do produto, `hashSerial(serial)` para serial com privacidade, `mnemonicSuffix(mnemonic)` para sufixo unico de 6 hex chars. |
-| **`wallet.ts`** | Core | `@evolution-sdk/evolution` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via Client) e `signMessage` (via COSE direto). `createMainWalletClient()` cria Client para a carteira principal. |
-| **`payloads.ts`** | Dados | `./hash.ts` | Define payloads DPP para os 4 atores com GTINs fixos e seriais dinamicos (sufixo do mnemonico). Cada builder recebe `PayloadEnv` com sufixo e tx hashes anteriores. Retorna `{payload, serial, gtin}`. |
-| **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (padrao: 50 ADA cada, configuravel via `adaPerWallet`). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. |
-| **`issuer.ts`** | Emissao | `@uverify/sdk` | `issueAllCredentials()` emite credenciais sequencialmente. Internamente: prepara colateral, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retentativas automaticas com intervalos crescentes (5 tentativas, inicio em 40s, dobrando a cada vez). |
-| **`verify.ts`** | Verificacao | Nenhuma (fetch nativo) | `verifyChain()` busca credenciais por data_hash na API UVerify, classifica campos por prefixo, caminha a cadeia de referencias. Auto-detecta reciclagem. CLI: le `DATA_HASH_PACK` do .env. |
-| **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Entry point para `deno task run`. |
+| **`wallet.ts`** | Core | `@evolution-sdk/evolution` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via Client) e `signMessage` (via COSE direto), e expoe o `client` para transacoes diretas (modo metadata). `createMainWalletClient()` cria Client para a carteira principal. |
+| **`payloads.ts`** | Dados | `./hash.ts` | Define payloads DPP para os 4 atores com GTINs fixos e seriais dinamicos (sufixo do mnemonico). Cada builder recebe `PayloadEnv` com sufixo e tx hashes anteriores. Retorna `{payload, serial, gtin}`. Usado por ambos os modos de emissao. |
+| **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (padrao: 50 ADA cada). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. Identico para ambos os modos. |
+| **`issuer.ts`** | Emissao | `@uverify/sdk` | Modo UVerify: `issueAllCredentials()` emite credenciais sequencialmente. Prepara colateral para Plutus V3, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retentativas automaticas com intervalos crescentes (5 tentativas, inicio em 40s, dobrando a cada vez). |
+| **`issuer-direto.ts`** | Emissao | `@evolution-sdk/evolution` | Modo Metadata: `issueAllCredentialsDireto()` emite credenciais sequencialmente via metadados nativos (label 1990). Constroi transacoes com o payload DPP completo como metadado. Divide valores > 64 bytes em arrays. Paga somente a taxa de rede. |
+| **`verify.ts`** | Verificacao | Nenhuma (fetch nativo) | Verificador dual-path: tenta Blockfrost metadata (label 1990) primeiro, com fallback para API UVerify. `verifyChain()` classifica campos por prefixo, caminha a cadeia de referencias (pack → celula → origem). Auto-detecta reciclagem. Funciona para ambos os modos. |
+| **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Seleciona automaticamente `issuer.ts` ou `issuer-direto.ts` com base em `EMISSION_MODE`. Entry point para `deno task run` e `deno task run-metadata`. |
 
 ### Dependencias npm/jsr
 
@@ -615,9 +621,9 @@ Imagine que cada etapa da fabricacao da bateria precisa ser "autenticada em cart
 4. **RecicLar** vai ao cartorio e registra: "Reciclamos o pack registrado em `tx_hash_pack`, com celulas de `tx_hash_celula` e litio de `tx_hash_origem`"
    - Referencia **todos os registros anteriores**
 
-O **verificador** e como alguem que vai ao cartorio e pede: "Me mostre o registro `tx_hash_pack`, e todos os registros que ele referencia." O cartorio (UVerify API) retorna a cadeia completa, verificavel e imutavel.
+O **verificador** e como alguem que vai ao cartorio e pede: "Me mostre o registro `tx_hash_pack`, e todos os registros que ele referencia." O cartorio (Blockfrost ou UVerify API) retorna a cadeia completa, verificavel e imutavel.
 
-> **Nota:** Nesta implementacao, todas as credenciais usam o metodo "cofre + protocolo" (anchor + off-chain via UVerify). Em outros cenarios, e possivel usar o metodo "carta registrada" (metadata nativa Cardano), onde o documento completo fica gravado direto na transacao — sem depender de nenhum servidor externo. Os dois metodos podem coexistir na mesma cadeia.
+> **Nota:** Esta implementacao suporta ambos os metodos: o "cofre + protocolo" (anchor + off-chain via UVerify, `EMISSION_MODE=uverify`) e a "carta registrada" (metadata nativa Cardano label 1990, `EMISSION_MODE=metadata`), onde o documento completo fica gravado direto na transacao — sem depender de nenhum servidor externo. Os dois metodos podem coexistir na mesma cadeia e o verificador funciona para ambos.
 
 ### A diferenca fundamental
 
@@ -636,7 +642,7 @@ No cartorio tradicional, voce confia no tabeliao (autoridade central). No Cardan
 | **ActorName** | Tipo TypeScript que define os 4 atores: `"origem" \| "celula" \| "pack" \| "reciclagem"`. |
 | **ActorWallet** | Interface TypeScript que encapsula uma carteira de ator com endereco, mnemonico e callbacks de assinatura (`signTx`, `signMessage`). |
 | **ADA / tADA** | Criptomoeda nativa do Cardano. tADA e ADA de teste (sem valor real). |
-| **Backoff exponencial** | Estrategia de retentativa onde o delay dobra a cada tentativa (10s → 20s → 40s → 60s max). |
+| **Backoff exponencial** | Estrategia de retentativa onde o delay dobra a cada tentativa (40s → 80s → 160s → 320s → 640s, 5 tentativas). |
 | **BIP-39** | Padrao para gerar mnemonicos de 24 palavras (256 bits de entropia) que derivam chaves criptograficas deterministas. |
 | **Blockfrost** | API-as-a-service para Cardano. Evita a necessidade de rodar um no completo. |
 | **CIP-8** | Cardano Improvement Proposal para assinatura de mensagens arbitrarias usando COSE (CBOR Object Signing and Encryption). |

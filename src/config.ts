@@ -5,6 +5,19 @@
 import "@std/dotenv/load";
 import type { EmissionMode, PipelineConfig } from "./types.ts";
 
+/**
+ * Load and validate pipeline configuration from .env variables.
+ *
+ * Required variables:
+ *   - BLOCKFROST_PROJECT_ID: Blockfrost API key for preprod (rejects placeholder and mainnet keys)
+ *   - WALLET_MNEMONIC: 24-word BIP-39 mnemonic for the main funding wallet
+ *
+ * Optional variables:
+ *   - UVERIFY_API_URL: UVerify API base URL (defaults to preprod)
+ *   - EMISSION_MODE: "uverify" (default) or "metadata"
+ *
+ * Throws descriptive errors if required variables are missing or invalid.
+ */
 export function loadConfig(): PipelineConfig {
   const blockfrostProjectId = Deno.env.get("BLOCKFROST_PROJECT_ID")?.trim();
   if (!blockfrostProjectId || blockfrostProjectId.startsWith("preprodXXXX")) {

@@ -24,6 +24,10 @@ const INITIAL_DELAY_MS = 40_000;
 
 /**
  * Wait for a UVerify transaction to be confirmed on-chain.
+ *
+ * Polls the UVerify confirmation endpoint (GET /api/v1/transaction/confirm/{txHash})
+ * every 5 seconds until it returns HTTP 200 (confirmed) or the timeout expires.
+ * Returns true if confirmed, false if timeout reached.
  */
 async function waitForUVerifyConfirmation(
   baseUrl: string,
@@ -48,6 +52,11 @@ async function waitForUVerifyConfirmation(
 
 /**
  * Poll the collateral endpoint until the UTxO is confirmed available.
+ *
+ * Plutus V3 scripts require a collateral UTxO (>= 5 ADA) to be present
+ * before building credential transactions. This function repeatedly calls
+ * POST /prepare-collateral until the response indicates the collateral
+ * is available (COLLATERAL_ALREADY_AVAILABLE or no unsignedTransaction).
  * Returns as soon as collateral is ready, or after timeoutMs (default 60s).
  */
 async function waitForCollateralReady(
@@ -191,10 +200,23 @@ async function prepareCollateral(
 }
 
 /**
- * Issue a single credential for one actor.
+ * Issue a single credential for one actor via UVerify smart contracts.
  *
- * Uses UVerify's core.buildTransaction() + core.submitTransaction()
- * for full control over the payload (including ref_*_tx fields).
+ * Uses the low-level UVerify flow for full control over the payload:
+ *   1. Builds the DPP payload (product data + references to previous actors)
+ *   2. Computes data_hash = sha256(gtin + serial) as the on-chain anchor
+ *   3. Creates a UVerifyClient with the actor's signing callbacks
+ *   4. Prepares collateral UTxO (>= 5 ADA) for Plutus V3 execution
+ *   5. Calls core.buildTransaction() — UVerify builds the Cardano tx with
+ *      the Plutus V3 reference script, redeemer, and script address output
+ *   6. Signs the unsigned tx with the actor's payment key
+ *   7. Calls core.submitTransaction() — UVerify submits to the Cardano node
+ *   8. Waits for on-chain confirmation via polling
+ *
+ * Includes exponential backoff retry (5 attempts, starting at 40s) for
+ * transient errors. Handles special statuses: COLLATERAL_REQUIRED
+ * (re-prepares collateral), PENDING_TRANSACTION (waits 30s).
+ * Fatal error: "no utxos found" (wallet empty) — throws immediately.
  */
 export async function issueCredential(
   config: PipelineConfig,
@@ -318,10 +340,14 @@ export async function issueCredential(
 }
 
 /**
- * Issue credentials for all 4 actors sequentially.
+ * Issue credentials for all 4 actors sequentially via UVerify smart contracts.
  *
- * Each actor references the previous actor's txHash, so parallel
- * issuance is not possible. The env is updated after each issuance.
+ * Issuance order: origem → celula → pack → reciclagem.
+ * Each actor references the previous actor's txHash (ref_*_tx fields),
+ * so parallel issuance is not possible. The PayloadEnv is updated after
+ * each issuance with the resulting txHash so the next actor can reference it.
+ *
+ * Used by main.ts when EMISSION_MODE=uverify (default).
  */
 export async function issueAllCredentials(
   config: PipelineConfig,

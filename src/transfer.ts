@@ -16,6 +16,13 @@ const DEFAULT_FUNDING_LOVELACE = 50_000_000n;
 /**
  * Fund actor wallets from the main wallet in a single transaction.
  *
+ * Creates an evolution-sdk Client for the main wallet, then builds a
+ * single Cardano transaction with one output per actor wallet (default
+ * 50 ADA each = 200 ADA total). Using a single tx with multiple outputs
+ * is faster than individual transfers and avoids UTxO chaining issues.
+ *
+ * The tx is built → signed → submitted via the evolution-sdk pipeline.
+ *
  * @param adaPerWallet — ADA to send per wallet (default 50).
  * @returns The transaction hash of the funding tx.
  */
@@ -68,7 +75,11 @@ export async function fundActorWallets(
 
 /**
  * Wait for a transaction to be confirmed on-chain.
- * Polls the Blockfrost API until the tx has at least 1 confirmation.
+ *
+ * Polls the Blockfrost API (GET /txs/{txHash}) every 5 seconds until
+ * the tx appears on-chain (HTTP 200) or the timeout expires (default 120s).
+ * Used after the funding transaction to ensure actor wallets have ADA
+ * before attempting credential issuance.
  */
 export async function waitForConfirmation(
   config: PipelineConfig,

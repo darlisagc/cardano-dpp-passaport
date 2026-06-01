@@ -19,6 +19,20 @@ import type { ActorName, ActorWallet, PipelineConfig } from "../types.ts";
 import { ACTOR_ORDER } from "../types.ts";
 import { createActorWallet, generateMnemonic } from "../wallet.ts";
 
+/**
+ * Main setup entry point.
+ *
+ * Executes Steps 0-3 of the DPP pipeline:
+ *   Step 0: Load and validate .env configuration
+ *   Step 1: Generate 4 BIP-39 mnemonics, derive Enterprise addresses,
+ *           save all mnemonics and addresses to .env
+ *   Step 2: Build and submit a single funding tx (4 x 50 ADA)
+ *   Step 3: Wait for funding confirmation + 15s UTxO propagation buffer
+ *
+ * After this completes, the user can issue credentials one at a time
+ * using `deno task issue-origem`, `deno task issue-celula`, etc.
+ * This command is the same for both emission modes (uverify and metadata).
+ */
 async function main(): Promise<void> {
   console.log("=".repeat(64));
   console.log("Cardano DPP Passaport — Setup (wallets + funding)");

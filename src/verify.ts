@@ -29,6 +29,14 @@ interface VerifiedCredential {
 
 /**
  * Classify metadata fields by naming convention.
+ *
+ * DPP payloads use prefixed keys to encode different types of data:
+ *   - ref_*_tx      → tx hash references to previous actors in the chain
+ *   - ref_*_data_hash → data_hash references for cross-verification
+ *   - mat_*         → material composition percentages
+ *
+ * This function separates a flat metadata Record into three categorized
+ * maps, stripping the "ref_" prefix from reference keys for cleaner access.
  */
 function classifyFields(
   meta: Record<string, string>,
@@ -57,8 +65,14 @@ function classifyFields(
 }
 
 /**
- * Convert a Blockfrost metadata value (which may be a string or array of
- * strings for chunked values) back to a plain string.
+ * Convert a Blockfrost metadata value back to a plain string.
+ *
+ * Metadata values from Blockfrost can be:
+ *   - string: returned as-is
+ *   - array: chunked strings (values > 64 bytes), joined back together
+ *   - number/bigint: converted to string
+ *
+ * This handles the chunking done by issuer-direto.ts for long values.
  */
 function metadatumToString(value: unknown): string {
   if (typeof value === "string") return value;
@@ -68,14 +82,14 @@ function metadatumToString(value: unknown): string {
 }
 
 /**
- * Parse a Blockfrost metadata JSON object (from /txs/{hash}/metadata)
- * into a flat Record<string, string>.
+ * Parse a Blockfrost metadata JSON object into a flat Record<string, string>.
  *
- * Blockfrost returns metadata as:
+ * Blockfrost returns transaction metadata as an array of label entries:
  *   [{ label: "1990", json_metadata: { key: value, ... } }]
  *
- * For TransactionMetadatum Maps, json_metadata is an object where keys
- * are strings and values are strings or arrays (chunked text).
+ * This function finds the DPP label (1990), extracts the json_metadata
+ * object, and converts all values to strings (handling chunked arrays
+ * via metadatumToString). Returns null if label 1990 is not found.
  */
 function parseBlockfrostMetadata(
   metadataArray: Array<{ label: string; json_metadata: unknown }>,
@@ -96,7 +110,11 @@ function parseBlockfrostMetadata(
 
 /**
  * Verify a credential by fetching native metadata from Blockfrost.
- * Works for direct-metadata-issued credentials (label 1990).
+ *
+ * Calls GET /txs/{txHash}/metadata on the Blockfrost API, looks for
+ * label 1990, and parses the DPP payload into a VerifiedCredential.
+ * Works for credentials issued in metadata mode (issuer-direto.ts).
+ * Returns null if the tx has no label-1990 metadata (e.g. UVerify mode).
  */
 async function verifyByBlockfrostMetadata(
   config: PipelineConfig,
@@ -143,7 +161,12 @@ async function verifyByBlockfrostMetadata(
 
 /**
  * Look up a credential on UVerify by data_hash.
- * Optionally filter by tx_hash for exact match.
+ *
+ * Calls GET /api/v1/verify/{dataHash} on the UVerify public API.
+ * The API returns an array of matching credentials; if tx_hash is
+ * provided, the exact match is preferred. Falls back to the first
+ * result if no exact tx match is found.
+ * Works for credentials issued in UVerify mode (issuer.ts).
  */
 async function verifyByDataHash(
   baseUrl: string,
@@ -240,7 +263,10 @@ async function verifyCredential(
 }
 
 /**
- * Print a verified credential summary.
+ * Print a verified credential summary to the console.
+ *
+ * Displays the credential's name, issuer, origin, GTIN, date, CO2 footprint,
+ * materials breakdown (if any), and a Cexplorer link to the transaction.
  */
 function printCredential(label: string, cred: VerifiedCredential): void {
   console.log(`\n  ${label}:`);

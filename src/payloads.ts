@@ -57,6 +57,13 @@ export async function buildPayloadEnv(
 // First in chain. No references to previous actors.
 // =====================================================================
 
+/**
+ * Build the DPP payload for Actor 1 (MineraLitio — lithium extraction).
+ *
+ * This is the first credential in the chain, so it has no ref_* fields.
+ * Includes lithium purity, ESG certifications, and environmental license.
+ * The serial is made unique per run by appending the mnemonic-derived suffix.
+ */
 async function payloadOrigem(env: PayloadEnv): Promise<PayloadResult> {
   const serial = `${SERIAL_BASE_ORIGEM}-${env.suffix}`;
   const gtin = GTIN_ORIGEM;
@@ -86,6 +93,14 @@ async function payloadOrigem(env: PayloadEnv): Promise<PayloadResult> {
 // References Actor 1 via ref_origem_tx + ref_origem_data_hash.
 // =====================================================================
 
+/**
+ * Build the DPP payload for Actor 2 (CellTech — NMC 811 cell manufacturing).
+ *
+ * References Actor 1 (origem) via ref_origem_tx and ref_origem_data_hash.
+ * Throws if ator1Tx is not set (Actor 1 must be issued first).
+ * Computes the origem data_hash from the same GTIN+serial that Actor 1 used,
+ * so the verifier can cross-reference both credentials.
+ */
 async function payloadCelula(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator1Tx) {
     throw new Error("ATOR1_TX is required before issuing celula");
@@ -124,6 +139,13 @@ async function payloadCelula(env: PayloadEnv): Promise<PayloadResult> {
 // References Actor 2 via ref_celula_tx + ref_celula_data_hash.
 // =====================================================================
 
+/**
+ * Build the DPP payload for Actor 3 (PackMontadora — battery pack assembly).
+ *
+ * References Actor 2 (celula) via ref_celula_tx and ref_celula_data_hash.
+ * Throws if ator2Tx is not set (Actor 2 must be issued first).
+ * This is typically the entry point for verification (DATA_HASH_PACK).
+ */
 async function payloadPack(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator2Tx) {
     throw new Error("ATOR2_TX is required before issuing pack");
@@ -163,6 +185,14 @@ async function payloadPack(env: PayloadEnv): Promise<PayloadResult> {
 // References all 3 previous actors for full reverse traceability.
 // =====================================================================
 
+/**
+ * Build the DPP payload for Actor 4 (RecicLar — end-of-life recycling).
+ *
+ * References all 3 previous actors (origem, celula, pack) via ref_*_tx
+ * and ref_*_data_hash fields. This provides full reverse traceability
+ * from recycling back to the raw lithium extraction.
+ * Throws if any of the 3 prerequisite tx hashes are missing.
+ */
 async function payloadReciclagem(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator1Tx || !env.ator2Tx || !env.ator3Tx) {
     throw new Error(
