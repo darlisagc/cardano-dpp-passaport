@@ -1,8 +1,9 @@
 /**
  * Direct metadata credential issuance — no smart contracts.
  *
- * Builds self-pay transactions with DPP payloads as native Cardano
- * metadata under label 1990. Uses the evolution-sdk Client for
+ * Builds transactions with DPP payloads as native Cardano metadata
+ * under label 1990. Only the network fee is paid; change goes back
+ * to the issuing wallet. Uses the evolution-sdk Client for
  * transaction building and Blockfrost for confirmation polling.
  *
  * Analogous to the Python `emissor_direto.py` — writes the full
@@ -10,8 +11,6 @@
  */
 
 import {
-  Address,
-  Assets,
   TransactionHash,
   TransactionMetadatum,
 } from "@evolution-sdk/evolution";
@@ -116,8 +115,8 @@ async function waitForBlockfrostConfirmation(
 /**
  * Issue a single credential for one actor using direct native metadata.
  *
- * Builds a self-pay transaction (sends 2 ADA back to self) with the DPP
- * payload attached as metadata under label 1990.
+ * Builds a metadata-only transaction (pays only the network fee; change
+ * goes back to the issuing wallet) with the DPP payload under label 1990.
  */
 export async function issueCredentialDireto(
   config: PipelineConfig,
@@ -145,14 +144,9 @@ export async function issueCredentialDireto(
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const actorClient = wallet.client;
-      const selfAddress = Address.fromBech32(wallet.address);
 
       const signBuilder = await actorClient
         .newTx()
-        .payToAddress({
-          address: selfAddress,
-          assets: Assets.fromLovelace(2_000_000n),
-        })
         .attachMetadata({
           label: METADATA_LABEL,
           metadata: metadatumMap,

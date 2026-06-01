@@ -73,7 +73,7 @@ O projeto suporta **dois modos de emissao** de credenciais. Ambos registram os d
 | | **UVerify** (padrao) | **Metadata** |
 |---|---|---|
 | Mecanismo | Smart contracts Plutus V3 via UVerify SDK | Metadados nativos do Cardano (label 1990) |
-| Dependencias on-chain | Requer colateral para scripts Plutus | Transacao simples (self-pay 2 ADA) |
+| Dependencias on-chain | Requer colateral para scripts Plutus | Transacao simples (somente taxa de rede) |
 | Verificacao | API UVerify + Blockfrost | Blockfrost diretamente |
 | Quando usar | Producao, integracao com ecossistema UVerify | Workshops, demos, ambientes sem smart contracts |
 
@@ -164,7 +164,7 @@ Ambos executam o fluxo completo automaticamente:
 4. **STEP 3** — Aguarda confirmacao do funding on-chain
 5. **STEP 4** — Emite credenciais sequencialmente:
    - **UVerify:** via UVerify SDK + smart contracts Plutus V3 (colateral, retentativas, confirmacao)
-   - **Metadata:** via transacao self-pay com payload no label 1990 (sem smart contracts)
+   - **Metadata:** via transacao com payload no label 1990 (sem smart contracts, somente taxa de rede)
    - Sequencia para ambos os modos:
      - Ator 1 (origem) → emite → armazena `ATOR1_TX`
      - Ator 2 (celula) → emite com `ref_origem_tx` → armazena `ATOR2_TX`
@@ -175,7 +175,7 @@ Ambos executam o fluxo completo automaticamente:
 **Detalhes tecnicos por modo:**
 
 - **UVerify:** Usa o UVerify SDK (`@uverify/sdk`) com smart contracts Plutus V3. Inclui preparacao de colateral, retentativas automaticas com intervalos crescentes, espera por confirmacao on-chain e gerenciamento de UTxOs pendentes.
-- **Metadata:** Usa o evolution-sdk (`@evolution-sdk/evolution`) para construir transacoes self-pay (2 ADA) com o payload DPP inteiro como metadado nativo sob o label 1990. Valores maiores que 64 bytes sao automaticamente divididos em arrays (limite do Cardano). Inclui retentativas e confirmacao via Blockfrost.
+- **Metadata:** Usa o evolution-sdk (`@evolution-sdk/evolution`) para construir transacoes com o payload DPP inteiro como metadado nativo sob o label 1990. Paga somente a taxa de rede; o troco retorna para a carteira do ator. Valores maiores que 64 bytes sao automaticamente divididos em arrays (limite do Cardano). Inclui retentativas e confirmacao via Blockfrost.
 
 ### Verificacao via navegador
 
@@ -242,7 +242,7 @@ cardano-dpp-passaport/
 | `payloads.ts` | Dados | Define os dados DPP dos 4 atores. Cada payload e um `Record<string, string>` com nome do produto, GTIN, origem, pegada de carbono, composicao de materiais e referencias aos atores anteriores (`ref_*_tx`, `ref_*_data_hash`). Sufixo unico derivado do mnemonico garante `data_hash` distintos por execucao. |
 | `transfer.ts` | Emissao | Constroi uma **transacao unica com 4 outputs** para financiar as carteiras dos atores. Usa o `Client` do `@evolution-sdk/evolution` com `newTx().payToAddress()`. Inclui polling de confirmacao via API Blockfrost. |
 | `issuer.ts` | Emissao | Emite credenciais via UVerify SDK (`core.buildTransaction()` + `core.submitTransaction()`). Inclui preparacao de colateral para Plutus V3, retentativas automaticas com intervalos crescentes (ate 5 tentativas), tratamento de UTxOs pendentes e espera por confirmacao on-chain. Usado quando `EMISSION_MODE=uverify` (padrao). |
-| `issuer-direto.ts` | Emissao | Emite credenciais via metadados nativos do Cardano (label 1990), sem smart contracts. Constroi transacoes self-pay (2 ADA) com o payload DPP inteiro como metadado. Divide valores maiores que 64 bytes em arrays (limite do Cardano). Usado quando `EMISSION_MODE=metadata`. |
+| `issuer-direto.ts` | Emissao | Emite credenciais via metadados nativos do Cardano (label 1990), sem smart contracts. Constroi transacoes com o payload DPP inteiro como metadado (somente taxa de rede; troco retorna para a carteira). Divide valores maiores que 64 bytes em arrays (limite do Cardano). Usado quando `EMISSION_MODE=metadata`. |
 | `verify.ts` | Verificacao | Verificador unificado com dual-path: tenta Blockfrost metadata primeiro (label 1990), com fallback para API UVerify (`GET /api/v1/verify/{dataHash}`). Classifica campos por prefixo (`ref_*`, `mat_*`) e percorre a cadeia de referencias ate a origem. Funciona para credenciais emitidas em **ambos os modos** (UVerify e metadata). |
 | `main.ts` | Orquestrador | Executa o pipeline completo: carrega config → gera carteiras → transfere ADA → aguarda confirmacao → emite credenciais sequencialmente → imprime resumo. Seleciona automaticamente o modulo de emissao (`issuer.ts` ou `issuer-direto.ts`) com base em `EMISSION_MODE`. |
 | `state.ts` | Core | Helpers para persistir estado no `.env`: `appendToEnv(key, value)` escreve/atualiza variaveis, `readEnvVar(key)` le variaveis. Usado pelos comandos CLI passo a passo. |
