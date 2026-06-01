@@ -23,46 +23,27 @@
 O DPP modela a cadeia de suprimentos de uma bateria de veiculo eletrico atraves de 4 atores, cada um com **sua propria carteira Cardano**:
 
 ```mermaid
-graph TB
-    subgraph "Carteira Principal"
-        MW["Main Wallet<br/>(financia os 4 atores)"]
+graph LR
+    subgraph "Cadeia de suprimentos"
+        C1["Ator 1 — MineraLitio<br/>Extracao de litio<br/>GTIN: 7891234560099"]
+        C2["Ator 2 — CellTech<br/>Celulas NMC 811<br/>GTIN: 7891234560105"]
+        C3["Ator 3 — PackMontadora<br/>Pack 75 kWh<br/>GTIN: 7891234560112"]
+        C4["Ator 4 — RecicLar<br/>Reciclagem<br/>GTIN: 7891234560129"]
     end
 
-    subgraph "Ator 1 — MineraLitio"
-        W1["Carteira Enterprise<br/>addr_test1..."]
-        C1["Credencial: Extracao de litio<br/>GTIN: 7891234560099"]
-    end
+    C1 -->|"materia-prima"| C2
+    C2 -->|"celulas"| C3
+    C3 -->|"pack"| C4
+```
 
-    subgraph "Ator 2 — CellTech"
-        W2["Carteira Enterprise<br/>addr_test1..."]
-        C2["Credencial: Celulas NMC 811<br/>GTIN: 7891234560105"]
-    end
+**Financiamento:** A carteira principal financia os 4 atores com tADA em uma unica transacao (4 outputs). Cada ator possui sua propria carteira Enterprise independente.
 
-    subgraph "Ator 3 — PackMontadora"
-        W3["Carteira Enterprise<br/>addr_test1..."]
-        C3["Credencial: Pack 75 kWh<br/>GTIN: 7891234560112"]
-    end
+**Referencias on-chain** (cada credencial referencia as anteriores):
 
-    subgraph "Ator 4 — RecicLar"
-        W4["Carteira Enterprise<br/>addr_test1..."]
-        C4["Credencial: Reciclagem<br/>GTIN: 7891234560129"]
-    end
-
-    MW -->|"ADA"| W1
-    MW -->|"ADA"| W2
-    MW -->|"ADA"| W3
-    MW -->|"ADA"| W4
-
-    W1 --> C1
-    W2 --> C2
-    W3 --> C3
-    W4 --> C4
-
-    C1 -->|"ref_origem_tx"| C2
-    C2 -->|"ref_celula_tx"| C3
-    C1 -->|"ref_origem_tx"| C4
-    C2 -->|"ref_celula_tx"| C4
-    C3 -->|"ref_pack_tx"| C4
+```
+Ator 2 (celula)     → ref_origem_tx, ref_origem_data_hash
+Ator 3 (pack)       → ref_celula_tx, ref_celula_data_hash
+Ator 4 (reciclagem) → ref_origem_tx, ref_celula_tx, ref_pack_tx (+ data_hashes)
 ```
 
 ### Carteiras independentes por ator
@@ -274,25 +255,32 @@ Tratamento de status especiais:
 
 ### Arquitetura de verificacao
 
-O verificador usa exclusivamente a **API publica do UVerify** para buscar e validar credenciais:
+O verificador usa **verificacao dual-path** — tenta Blockfrost metadata primeiro (funciona para modo metadata), com fallback para API UVerify (funciona para modo UVerify):
 
 ```mermaid
 sequenceDiagram
     participant V as Verificador (verify.ts)
+    participant B as Blockfrost API
     participant U as UVerify API
 
-    V->>U: GET /api/v1/verify/{dataHash_pack}
-    U-->>V: [{metadata, transactionHash, ...}]
+    V->>B: GET /txs/{txHash_pack}/metadata
+    alt Metadata label 1990 encontrado
+        B-->>V: [{label: "1990", json_metadata: {...}}]
+    else Nao encontrado
+        B-->>V: 404
+        V->>U: GET /api/v1/verify/{dataHash_pack}
+        U-->>V: [{metadata, transactionHash, ...}]
+    end
 
     Note over V: Extrai ref_celula_tx e ref_celula_data_hash
 
-    V->>U: GET /api/v1/verify/{dataHash_celula}
-    U-->>V: [{metadata, transactionHash, ...}]
+    V->>B: GET /txs/{txHash_celula}/metadata
+    B-->>V: Metadados da celula
 
     Note over V: Extrai ref_origem_tx e ref_origem_data_hash
 
-    V->>U: GET /api/v1/verify/{dataHash_origem}
-    U-->>V: [{metadata, transactionHash, ...}]
+    V->>B: GET /txs/{txHash_origem}/metadata
+    B-->>V: Metadados da origem
 
     Note over V: Imprime resumo da cadeia
 ```
@@ -302,9 +290,9 @@ sequenceDiagram
 ```
 ENTRADA: data_hash (do pack ou reciclagem) + tx_hash (opcional)
 
-1. Busca credencial por data_hash na API UVerify
-   - Se tx_hash fornecido, filtra para match exato
-   - Senao, usa primeiro resultado
+1. Busca credencial (dual-path):
+   - Se tx_hash disponivel → tenta Blockfrost metadata (label 1990) primeiro
+   - Se nao encontrado → fallback para API UVerify (GET /api/v1/verify/{dataHash})
 
 2. Classifica campos do payload:
    - ref_*_tx → referencias a transacoes anteriores
@@ -445,7 +433,6 @@ cardano-dpp-passaport/
 ├── .env                         # Variaveis de ambiente (gitignored)
 ├── .gitignore
 ├── README.md                    # Documentacao principal
-├── mao-na-massa.md              # Guia pratico (este documento)
 ├── arquitetura-dpp.md           # Arquitetura (este documento)
 └── src/
     ├── types.ts                 # Interfaces e tipos centrais
@@ -454,9 +441,10 @@ cardano-dpp-passaport/
     ├── wallet.ts                # Geracao de carteiras e callbacks de assinatura
     ├── payloads.ts              # Payloads DPP dos 4 atores
     ├── transfer.ts              # Transferencia de ADA (funding)
-    ├── issuer.ts                # Emissao via UVerify SDK
-    ├── verify.ts                # Verificacao da cadeia
-    └── main.ts                  # Orquestrador do pipeline
+    ├── issuer.ts                # Emissao via UVerify SDK (modo uverify)
+    ├── issuer-direto.ts         # Emissao via metadados nativos (modo metadata)
+    ├── verify.ts                # Verificacao da cadeia (ambos os modos)
+    └── main.ts                  # Orquestrador do pipeline (ambos os modos)
 ```
 
 ### Diagrama de dependencias entre modulos
