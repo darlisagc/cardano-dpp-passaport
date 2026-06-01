@@ -19,8 +19,8 @@ import type {
   PipelineConfig,
 } from "./types.ts";
 
-const MAX_ATTEMPTS = 8;
-const INITIAL_DELAY_MS = 10_000;
+const MAX_ATTEMPTS = 5;
+const INITIAL_DELAY_MS = 40_000;
 
 /**
  * Wait for a UVerify transaction to be confirmed on-chain.
@@ -301,7 +301,7 @@ export async function issueCredential(
         throw lastError;
       }
 
-      const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, attempt - 1), 60_000);
+      const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
       if (attempt < MAX_ATTEMPTS) {
         console.log(
           `  Attempt ${attempt}/${MAX_ATTEMPTS} failed (${lastError.message}), ` +

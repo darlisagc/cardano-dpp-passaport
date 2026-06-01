@@ -30,6 +30,34 @@ Cada ator **emite** uma credencial contendo dados do produto (GTIN, origem, pega
 | tADA | Obtenha ADA de teste no [faucet preprod](https://docs.cardano.org/cardano-testnets/tools/faucet/) (minimo ~210 ADA) |
 | Blockfrost | Conta gratuita em [blockfrost.io](https://blockfrost.io) — crie um projeto **preprod** |
 
+### Instalando o Deno
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://deno.land/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://deno.land/install.ps1 | iex
+```
+
+**Via Homebrew (macOS):**
+
+```bash
+brew install deno
+```
+
+Apos a instalacao, verifique com:
+
+```bash
+deno --version
+```
+
+Para mais detalhes, consulte a [documentacao oficial de instalacao](https://docs.deno.com/runtime/getting_started/installation/).
+
 ## Setup
 
 ```bash
