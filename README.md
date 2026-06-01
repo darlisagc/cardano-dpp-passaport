@@ -108,29 +108,15 @@ Antes de emitir, certifique-se de ter tADA na carteira preprod cujo mnemonico es
 
 Emita cada credencial individualmente, entendendo cada etapa:
 
-**Modo UVerify (padrao):**
+**Modo Metadata:**
 
 ```bash
 # 1. Setup (uma vez) — gera carteiras + financia
 deno task setup
 
-# 2. Emissao de credenciais (um por vez, nesta ordem)
-deno task issue-origem       # Ator 1 — sem dependencias
-deno task issue-celula       # Ator 2 — requer ATOR1_TX no .env
-deno task issue-pack         # Ator 3 — requer ATOR2_TX no .env
-deno task issue-reciclagem   # Ator 4 — requer ATOR1/2/3_TX no .env
-
-# 3. Verificacao
-deno task verify
-```
-
-**Modo Metadata:**
-
-```bash
-# 1. Setup (uma vez) — identico ao UVerify
-deno task setup
-
 # 2. Emissao via metadados nativos (um por vez, nesta ordem)
+# Aguarde a confirmacao on-chain de cada transacao antes de emitir a proxima
+# (verifique no Cexplorer ou aguarde ~30-40 segundos entre cada comando)
 deno task issue-origem-metadata       # Ator 1
 deno task issue-celula-metadata       # Ator 2
 deno task issue-pack-metadata         # Ator 3
@@ -140,20 +126,38 @@ deno task issue-reciclagem-metadata   # Ator 4
 deno task verify
 ```
 
-Cada comando salva seu resultado no `.env` (mnemonicos, enderecos, tx hashes, data hashes). O proximo comando le de la automaticamente. Voce pode pausar entre os comandos e retomar mais tarde.
-
-### Pipeline completo (automatizado)
-
 **Modo UVerify (padrao):**
 
 ```bash
-deno task run
+# 1. Setup (uma vez) — gera carteiras + financia
+deno task setup
+
+# 2. Emissao de credenciais (um por vez, nesta ordem)
+# Aguarde a confirmacao on-chain de cada transacao antes de emitir a proxima
+# (verifique no Cexplorer ou aguarde ~30-40 segundos entre cada comando)
+deno task issue-origem       # Ator 1 — sem dependencias
+deno task issue-celula       # Ator 2 — requer ATOR1_TX no .env
+deno task issue-pack         # Ator 3 — requer ATOR2_TX no .env
+deno task issue-reciclagem   # Ator 4 — requer ATOR1/2/3_TX no .env
+
+# 3. Verificacao
+deno task verify
 ```
+
+Cada comando salva seu resultado no `.env` (mnemonicos, enderecos, tx hashes, data hashes). O proximo comando le de la automaticamente. Voce pode pausar entre os comandos e retomar mais tarde.
+
+### Pipeline completo (automatizado)
 
 **Modo Metadata:**
 
 ```bash
 deno task run-metadata
+```
+
+**Modo UVerify (padrao):**
+
+```bash
+deno task run
 ```
 
 Ambos executam o fluxo completo automaticamente:
