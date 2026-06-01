@@ -263,10 +263,12 @@ sequenceDiagram
     participant B as Blockfrost API
     participant U as UVerify API
 
+    Note over V: 1. Busca credencial do Pack
+
     V->>B: GET /txs/{txHash_pack}/metadata
-    alt Metadata label 1990 encontrado
+    alt Metadata label 1990 encontrado (modo metadata)
         B-->>V: [{label: "1990", json_metadata: {...}}]
-    else Nao encontrado
+    else Nao encontrado (modo uverify)
         B-->>V: 404
         V->>U: GET /api/v1/verify/{dataHash_pack}
         U-->>V: [{metadata, transactionHash, ...}]
@@ -274,15 +276,31 @@ sequenceDiagram
 
     Note over V: Extrai ref_celula_tx e ref_celula_data_hash
 
+    Note over V: 2. Busca credencial da Celula
+
     V->>B: GET /txs/{txHash_celula}/metadata
-    B-->>V: Metadados da celula
+    alt Metadata label 1990 encontrado (modo metadata)
+        B-->>V: [{label: "1990", json_metadata: {...}}]
+    else Nao encontrado (modo uverify)
+        B-->>V: 404
+        V->>U: GET /api/v1/verify/{dataHash_celula}
+        U-->>V: [{metadata, transactionHash, ...}]
+    end
 
     Note over V: Extrai ref_origem_tx e ref_origem_data_hash
 
-    V->>B: GET /txs/{txHash_origem}/metadata
-    B-->>V: Metadados da origem
+    Note over V: 3. Busca credencial da Origem
 
-    Note over V: Imprime resumo da cadeia
+    V->>B: GET /txs/{txHash_origem}/metadata
+    alt Metadata label 1990 encontrado (modo metadata)
+        B-->>V: [{label: "1990", json_metadata: {...}}]
+    else Nao encontrado (modo uverify)
+        B-->>V: 404
+        V->>U: GET /api/v1/verify/{dataHash_origem}
+        U-->>V: [{metadata, transactionHash, ...}]
+    end
+
+    Note over V: 4. Imprime resumo: VERIFIED / MISSING para cada etapa
 ```
 
 ### Algoritmo de caminhada na cadeia
