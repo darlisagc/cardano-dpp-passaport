@@ -109,7 +109,7 @@ Executa o fluxo completo automaticamente:
    - Ator 4 (reciclagem) → emite com `ref_pack_tx`, `ref_celula_tx`, `ref_origem_tx`
 6. **STEP 5** — Imprime resumo com tx hashes, links Cexplorer e URLs de verificacao UVerify
 
-A emissao usa o **UVerify SDK** (`@uverify/sdk`), que interage com **smart contracts Plutus V3** na preprod. O modulo de emissao inclui tratamento robusto de erros: preparacao de colateral, retentativas com backoff exponencial, espera por confirmacao on-chain e gerenciamento de UTxOs pendentes.
+A emissao usa o **UVerify SDK** (`@uverify/sdk`), que interage com **smart contracts Plutus V3** na preprod. O modulo de emissao inclui tratamento robusto de erros: preparacao de colateral, retentativas automaticas com intervalos crescentes, espera por confirmacao on-chain e gerenciamento de UTxOs pendentes.
 
 ### Verificacao via navegador
 
@@ -162,7 +162,7 @@ cardano-dpp-passaport/
 | `wallet.ts` | Core | Gera mnemonicos BIP-39 (24 palavras, 256 bits), deriva enderecos Enterprise via CIP-1852, e cria callbacks de assinatura compativeis com o UVerify SDK. Usa abordagem hibrida: `Client.signTx()` para transacoes e `COSE.SignData.signData()` para mensagens CIP-8. |
 | `payloads.ts` | Dados | Define os dados DPP dos 4 atores. Cada payload e um `Record<string, string>` com nome do produto, GTIN, origem, pegada de carbono, composicao de materiais e referencias aos atores anteriores (`ref_*_tx`, `ref_*_data_hash`). Sufixo unico derivado do mnemonico garante `data_hash` distintos por execucao. |
 | `transfer.ts` | Emissao | Constroi uma **transacao unica com 4 outputs** para financiar as carteiras dos atores. Usa o `Client` do `@evolution-sdk/evolution` com `newTx().payToAddress()`. Inclui polling de confirmacao via API Blockfrost. |
-| `issuer.ts` | Emissao | Emite credenciais via UVerify SDK (`core.buildTransaction()` + `core.submitTransaction()`). Inclui preparacao de colateral para Plutus V3, retentativas com backoff exponencial (ate 8 tentativas), tratamento de UTxOs pendentes e espera por confirmacao on-chain. |
+| `issuer.ts` | Emissao | Emite credenciais via UVerify SDK (`core.buildTransaction()` + `core.submitTransaction()`). Inclui preparacao de colateral para Plutus V3, retentativas automaticas com intervalos crescentes (ate 5 tentativas), tratamento de UTxOs pendentes e espera por confirmacao on-chain. |
 | `verify.ts` | Verificacao | Verificador unificado. Busca credenciais pela API publica UVerify (`GET /api/v1/verify/{dataHash}`), classifica campos por prefixo (`ref_*`, `mat_*`), e percorre a cadeia de referencias ate a origem. Detecta automaticamente se a entrada e pack ou reciclagem. |
 | `main.ts` | Orquestrador | Executa o pipeline completo: carrega config → gera carteiras → transfere ADA → aguarda confirmacao → emite credenciais sequencialmente → imprime resumo com links Cexplorer e URLs de verificacao UVerify. |
 | `state.ts` | Core | Helpers para persistir estado no `.env`: `appendToEnv(key, value)` escreve/atualiza variaveis, `readEnvVar(key)` le variaveis. Usado pelos comandos CLI passo a passo. |
@@ -183,7 +183,7 @@ Versoes exatas estao fixadas no `deno.lock` (commitado para builds reproduziveis
 
 | Problema | Solucao |
 |----------|---------|
-| `No unlocked UTxOs available` | UTxO da transacao anterior ainda pendente. O codigo faz retentativas automaticas com backoff exponencial. |
+| `No unlocked UTxOs available` | UTxO da transacao anterior ainda pendente. O codigo faz retentativas automaticas com intervalos crescentes. |
 | `COLLATERAL_REQUIRED` | O modulo de emissao prepara colateral automaticamente (5 ADA). Se falhar, aguarde a confirmacao da tx anterior. |
 | `no utxos found` | Carteira vazia — verifique se o funding tx foi confirmado e se ha ADA suficiente. |
 | Timeout na confirmacao | A testnet preprod pode ter blocos mais lentos. O timeout padrao e 90s para emissao e 120s para funding. |

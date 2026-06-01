@@ -5,7 +5,7 @@
  * Uses the low-level core.buildTransaction() + core.submitTransaction()
  * flow for full control over custom ref_*_tx fields.
  *
- * Includes retry with exponential backoff for transient API errors.
+ * Includes automatic retries with increasing intervals for transient API errors.
  */
 
 import { UVerifyClient } from "@uverify/sdk";

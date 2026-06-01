@@ -388,16 +388,15 @@ const txHash = await client.core.submitTransaction(
 );
 ```
 
-#### Retentativas com backoff exponencial
+#### Retentativas automaticas com intervalos crescentes
 
-Transacoes podem falhar por motivos transitorios (UTxOs pendentes, rede lenta). O modulo de emissao faz ate **8 tentativas** com backoff exponencial:
+Transacoes podem falhar por motivos transitorios (UTxOs pendentes, rede lenta). O modulo de emissao faz ate **5 tentativas**, dobrando o intervalo a cada vez:
 
 ```
-Tentativa 1: delay 10s
-Tentativa 2: delay 20s
-Tentativa 3: delay 40s
-Tentativa 4: delay 60s (maximo)
-...
+Tentativa 1 → 2: espera 40s
+Tentativa 2 → 3: espera 80s
+Tentativa 3 → 4: espera 160s
+Tentativa 4 → 5: espera 320s
 ```
 
 O erro `"no utxos found"` e considerado **fatal** (carteira vazia) e nao e retentado.
@@ -607,7 +606,7 @@ graph LR
 |------|-------|---------|
 | `BLOCKFROST_PROJECT_ID is required` | Variavel nao definida no `.env` | Preencha com sua API key da Blockfrost (projeto preprod). |
 | `WALLET_MNEMONIC must be 24 words` | Mnemonico incompleto ou invalido | Verifique se sao exatamente 24 palavras separadas por espacos. |
-| `No unlocked UTxOs available` | UTxO da transacao anterior ainda pendente | O codigo faz retentativas automaticas com backoff exponencial. Aguarde. |
+| `No unlocked UTxOs available` | UTxO da transacao anterior ainda pendente | O codigo faz retentativas automaticas com intervalos crescentes. Aguarde. |
 | `COLLATERAL_REQUIRED` | Colateral nao preparado para Plutus V3 | O modulo de emissao prepara colateral automaticamente (5 ADA). Se falhar, aguarde a confirmacao da tx anterior. |
 | `no utxos found` | Carteira vazia | Verifique se o funding tx foi confirmado e se ha ADA suficiente (~210 ADA na carteira principal). |
 | Timeout na confirmacao | Testnet preprod com blocos lentos | O timeout padrao e 90s para emissao e 120s para funding. Aguarde e tente novamente. |

@@ -244,20 +244,20 @@ graph TD
 
 A separacao e necessaria porque o `Client.signMessage()` do evolution-sdk retorna o formato wallet-level `SignedMessage`, enquanto o UVerify espera o formato CIP-30 `DataSignature` com `{key, signature}` hex.
 
-#### 5. Resiliencia: retry com backoff exponencial
+#### 5. Resiliencia: retentativas automaticas com intervalos crescentes
 
 ```typescript
 // src/issuer.ts
-const MAX_ATTEMPTS = 8;
-const INITIAL_DELAY_MS = 10_000;
+const MAX_ATTEMPTS = 5;
+const INITIAL_DELAY_MS = 40_000;
 
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   try {
     // buildTransaction → signTx → submitTransaction
   } catch (e) {
     // "no utxos found" → fatal (carteira vazia)
-    // Qualquer outro erro → retry com delay exponencial
-    const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, attempt - 1), 60_000);
+    // Qualquer outro erro → retenta dobrando o intervalo
+    const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
     await new Promise((r) => setTimeout(r, delay));
   }
 }
@@ -505,7 +505,7 @@ graph TD
 | **`wallet.ts`** | Core | `@evolution-sdk/evolution` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via Client) e `signMessage` (via COSE direto). `createMainWalletClient()` cria Client para a carteira principal. |
 | **`payloads.ts`** | Dados | `./hash.ts` | Define payloads DPP para os 4 atores com GTINs fixos e seriais dinamicos (sufixo do mnemonico). Cada builder recebe `PayloadEnv` com sufixo e tx hashes anteriores. Retorna `{payload, serial, gtin}`. |
 | **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (padrao: 50 ADA cada, configuravel via `adaPerWallet`). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. |
-| **`issuer.ts`** | Emissao | `@uverify/sdk` | `issueAllCredentials()` emite credenciais sequencialmente. Internamente: prepara colateral, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retry com backoff exponencial (8 tentativas, delay inicial 10s, max 60s). |
+| **`issuer.ts`** | Emissao | `@uverify/sdk` | `issueAllCredentials()` emite credenciais sequencialmente. Internamente: prepara colateral, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retentativas automaticas com intervalos crescentes (5 tentativas, inicio em 40s, dobrando a cada vez). |
 | **`verify.ts`** | Verificacao | Nenhuma (fetch nativo) | `verifyChain()` busca credenciais por data_hash na API UVerify, classifica campos por prefixo, caminha a cadeia de referencias. Auto-detecta reciclagem. CLI: le `DATA_HASH_PACK` do .env. |
 | **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Entry point para `deno task run`. |
 
