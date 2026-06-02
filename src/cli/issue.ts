@@ -14,8 +14,10 @@
 import { loadConfig } from "../config.ts";
 import { issueCredentialDireto } from "../issuer-direto.ts";
 import { issueCredential } from "../issuer.ts";
-import { buildPayloadEnv } from "../payloads.ts";
+import { buildPayloadEnv, PAYLOAD_BUILDERS } from "../payloads.ts";
 import type { PayloadEnv } from "../payloads.ts";
+import { openEmissionReceipt } from "../reports/emission-receipt.ts";
+import { openReciclagemReport } from "../reports/reciclagem-report.ts";
 import { appendToEnv, readEnvVar } from "../state.ts";
 import type { ActorName } from "../types.ts";
 import { ACTOR_ENV_KEY } from "../types.ts";
@@ -184,6 +186,27 @@ async function main(): Promise<void> {
     console.log(`  Saved to .env: DATA_HASH_PACK=${result.dataHash}`);
   }
   console.log(`\nNext step: ${NEXT_STEP[actor]}`);
+
+  // ── Generate emission receipt ──────────────────────────────────
+  console.log("\nGenerating emission receipt...");
+  const receiptPayload = (await PAYLOAD_BUILDERS[actor](env)).payload;
+  await openEmissionReceipt({
+    actor,
+    payload: receiptPayload,
+    txHash: result.txHash,
+    dataHash: result.dataHash,
+  });
+
+  // For reciclagem, also generate the recycling report.
+  if (actor === "reciclagem") {
+    await new Promise((r) => setTimeout(r, 500));
+    console.log("Generating reciclagem report...");
+    await openReciclagemReport({
+      payload: receiptPayload,
+      txHash: result.txHash,
+      dataHash: result.dataHash,
+    });
+  }
 }
 
 main().catch((err) => {

@@ -12,7 +12,10 @@
 import { loadConfig } from "./config.ts";
 import { issueAllCredentialsDireto } from "./issuer-direto.ts";
 import { issueAllCredentials } from "./issuer.ts";
-import { buildPayloadEnv } from "./payloads.ts";
+import { buildPayloadEnv, PAYLOAD_BUILDERS } from "./payloads.ts";
+import { openEmissionReceipt } from "./reports/emission-receipt.ts";
+import { openReciclagemReport } from "./reports/reciclagem-report.ts";
+import { openSetupReceipt } from "./reports/setup-receipt.ts";
 import { appendCommentToEnv, appendToEnv } from "./state.ts";
 import { fundActorWallets, waitForConfirmation } from "./transfer.ts";
 import type { ActorName, ActorWallet, IssuanceResult, PipelineConfig } from "./types.ts";
@@ -167,6 +170,14 @@ async function main(): Promise<void> {
   console.log("Waiting 15s for UTxO propagation...");
   await new Promise((r) => setTimeout(r, 15_000));
 
+  // Generate setup receipt.
+  console.log("\nGenerating setup receipt...");
+  await openSetupReceipt({
+    wallets,
+    fundingTxHash,
+    adaPerWallet: 50,
+  });
+
   // ── STEP 4: Issue credentials sequentially ──────────────────────
   const env = await buildPayloadEnv(config.mainWalletMnemonic);
   const results = config.emissionMode === "metadata"
@@ -189,6 +200,28 @@ async function main(): Promise<void> {
   }
 
   console.log("\nAll results saved to .env");
+
+  // Generate emission receipts for all actors.
+  console.log("\nGenerating emission receipts...");
+  for (const r of results) {
+    const receiptPayload = (await PAYLOAD_BUILDERS[r.actor](env)).payload;
+    await openEmissionReceipt({
+      actor: r.actor,
+      payload: receiptPayload,
+      txHash: r.txHash,
+      dataHash: r.dataHash,
+    });
+    // For reciclagem, also generate the recycling report.
+    if (r.actor === "reciclagem") {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await openReciclagemReport({
+        payload: receiptPayload,
+        txHash: r.txHash,
+        dataHash: r.dataHash,
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 
   // ── STEP 6: Print summary ───────────────────────────────────────
   printSummary(results, wallets, fundingTxHash, config);

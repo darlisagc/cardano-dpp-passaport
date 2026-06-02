@@ -13,6 +13,7 @@
  */
 
 import { loadConfig } from "../config.ts";
+import { openSetupReceipt } from "../reports/setup-receipt.ts";
 import { appendCommentToEnv, appendToEnv } from "../state.ts";
 import { fundActorWallets, waitForConfirmation } from "../transfer.ts";
 import type { ActorName, ActorWallet, PipelineConfig } from "../types.ts";
@@ -131,6 +132,14 @@ async function main(): Promise<void> {
 
   console.log("\nAll mnemonics and addresses saved to .env");
   console.log("Next step: deno task issue-origem");
+
+  // ── Generate setup receipt ───────────────────────────────────────
+  console.log("\nGenerating setup receipt...");
+  await openSetupReceipt({
+    wallets,
+    fundingTxHash,
+    adaPerWallet: 50,
+  });
 }
 
 main().catch((err) => {

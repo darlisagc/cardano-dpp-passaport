@@ -13,7 +13,7 @@
 import type { PipelineConfig } from "./types.ts";
 
 /** Credential data extracted from verification response. */
-interface VerifiedCredential {
+export interface VerifiedCredential {
   name?: string;
   issuer?: string;
   gtin?: string;
@@ -302,7 +302,12 @@ export async function verifyChain(
   config: PipelineConfig,
   entryDataHash: string,
   entryTxHash?: string,
-): Promise<void> {
+): Promise<{
+  credOrigem?: VerifiedCredential;
+  credCelula?: VerifiedCredential;
+  credPack: VerifiedCredential;
+  credReciclagem?: VerifiedCredential;
+}> {
   console.log("=".repeat(64));
   console.log("DPP Chain Verification");
   console.log("=".repeat(64));
@@ -387,6 +392,9 @@ export async function verifyChain(
     console.log(`  ${status}: ${label} → ${name}`);
   }
   console.log("  " + "=".repeat(50));
+
+  // Return the verified credentials for report generation.
+  return { credOrigem, credCelula, credPack, credReciclagem };
 }
 
 // ── CLI entry point ─────────────────────────────────────────────────
@@ -396,6 +404,9 @@ export async function verifyChain(
 if (import.meta.main) {
   await import("@std/dotenv/load");
   const { loadConfig } = await import("./config.ts");
+  const { openVerificationReport } = await import(
+    "./reports/verification-report.ts"
+  );
 
   const config = loadConfig();
   const entryDataHash = Deno.env.get("DATA_HASH_PACK")?.trim();
@@ -408,5 +419,15 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  await verifyChain(config, entryDataHash, entryTxHash);
+  const { credOrigem, credCelula, credPack, credReciclagem } =
+    await verifyChain(config, entryDataHash, entryTxHash);
+
+  // Generate and open verification report in the browser.
+  console.log("\nGenerating verification report...");
+  await openVerificationReport({
+    origem: credOrigem,
+    celula: credCelula,
+    pack: credPack,
+    reciclagem: credReciclagem,
+  });
 }
