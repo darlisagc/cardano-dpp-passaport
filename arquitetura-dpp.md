@@ -191,7 +191,7 @@ O SDK e instanciado com os callbacks de assinatura do ator:
 // src/issuer.ts
 const client = new UVerifyClient({
   baseUrl: config.uverifyApiUrl,     // https://api.preprod.uverify.io
-  signTx: wallet.signTx,             // Client.signTx() do evolution-sdk
+  signTx: wallet.signTx,             // Construcao manual de witness (blake2b-256 + Ed25519 + VKeyWitness)
   signMessage: wallet.signMessage,   // COSE.SignData.signData()
 });
 ```
@@ -235,9 +235,12 @@ O sistema usa **dois mecanismos de assinatura** distintos:
 ```mermaid
 graph TD
     subgraph "Assinatura de transacao (signTx)"
-        TX1["unsignedCborHex"] --> TX2["Client.signTx()"]
-        TX2 --> TX3["TransactionWitnessSet.toCBORHex()"]
-        TX3 --> TX4["witnessSet CBOR-hex"]
+        TX1["unsignedCborHex"] --> TX2["Transaction.extractBodyBytes()"]
+        TX2 --> TX3["blake2b-256 (body hash)"]
+        TX3 --> TX4["PrivateKey.sign() (Ed25519)"]
+        TX4 --> TX5["VKeyWitness (vkey + signature)"]
+        TX5 --> TX6["TransactionWitnessSet.toCBORHex()"]
+        TX6 --> TX7["witnessSet CBOR-hex"]
     end
 
     subgraph "Assinatura CIP-8 (signMessage)"
@@ -249,10 +252,10 @@ graph TD
 
 | Tipo | Biblioteca | Entrada | Saida | Uso |
 |------|-----------|---------|-------|-----|
-| **Transaction signing** | `Client.signTx()` (evolution-sdk) | CBOR-hex unsigned tx | CBOR-hex witness set | Emissao de credenciais, colateral |
+| **Transaction signing** | Construcao manual de witness: `Transaction.extractBodyBytes()` + `blake2b` (`@noble/hashes`) + `PrivateKey.sign()` + `VKeyWitness` (evolution-sdk) | CBOR-hex unsigned tx | CBOR-hex witness set | Emissao de credenciais, colateral |
 | **Message signing (CIP-8)** | `COSE.SignData.signData()` (evolution-sdk) | String de mensagem | `{key, signature}` hex | Operacoes de estado UVerify |
 
-A separacao e necessaria porque o `Client.signMessage()` do evolution-sdk retorna o formato wallet-level `SignedMessage`, enquanto o UVerify espera o formato CIP-30 `DataSignature` com `{key, signature}` hex.
+A construcao manual de witness e necessaria porque `Client.signTx()` do evolution-sdk produz witness sets vazios/malformados para transacoes construidas por servicos externos (e.g. endpoint de colateral do UVerify). A abordagem manual extrai os bytes do body da transacao, calcula o hash blake2b-256, assina com Ed25519 e constroi o VKeyWitness diretamente. Para mensagens, `COSE.SignData.signData()` e usado diretamente porque o UVerify espera o formato CIP-30 `DataSignature` com `{key, signature}` hex.
 
 #### 5. Resiliencia: retentativas automaticas com intervalos crescentes
 
@@ -555,7 +558,7 @@ graph TD
 | **`types.ts`** | Dados | Nenhuma | Define `ActorName`, `EmissionMode`, `ActorWallet`, `IssuanceResult`, `PipelineConfig`, `DppPayload`, `PayloadResult`. Sem logica, apenas tipos e constantes (`ACTOR_ORDER`, `ACTOR_ENV_KEY`). |
 | **`config.ts`** | Infraestrutura | `@std/dotenv` | Carrega `.env`, valida `BLOCKFROST_PROJECT_ID` (rejeita placeholder e chaves mainnet) e `WALLET_MNEMONIC` (deve ter 24 palavras). Valida `EMISSION_MODE` ("uverify" ou "metadata"). Retorna `PipelineConfig` tipado. |
 | **`hash.ts`** | Core | Nenhuma (Web Crypto API nativa) | Tres funcoes puras: `dataHash(gtin, serial)` para fingerprint do produto, `hashSerial(serial)` para serial com privacidade, `mnemonicSuffix(mnemonic)` para sufixo unico de 6 hex chars. |
-| **`wallet.ts`** | Core | `@evolution-sdk/evolution` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via Client) e `signMessage` (via COSE direto), e expoe o `client` para transacoes diretas (modo metadata). `createMainWalletClient()` cria Client para a carteira principal. |
+| **`wallet.ts`** | Core | `@evolution-sdk/evolution`, `@noble/hashes` | `generateMnemonic()` gera BIP-39 256-bit. `createActorWallet()` cria Client com Enterprise address, deriva payment key CIP-1852, monta callbacks `signTx` (via construcao manual de witness: blake2b-256 + Ed25519 + VKeyWitness) e `signMessage` (via COSE direto), e expoe o `client` para transacoes diretas (modo metadata). `createMainWalletClient()` cria Client para a carteira principal. |
 | **`payloads.ts`** | Dados | `./hash.ts` | Define payloads DPP para os 4 atores com GTINs fixos e seriais dinamicos (sufixo do mnemonico). Cada builder recebe `PayloadEnv` com sufixo e tx hashes anteriores. Retorna `{payload, serial, gtin}`. Usado por ambos os modos de emissao. |
 | **`transfer.ts`** | Emissao | `@evolution-sdk/evolution` | `fundActorWallets()` constroi tx unica com 4 outputs (padrao: 50 ADA cada). `waitForConfirmation()` faz polling na API Blockfrost ate tx aparecer on-chain. Identico para ambos os modos. |
 | **`issuer.ts`** | Emissao | `@uverify/sdk` | Modo UVerify: `issueAllCredentials()` emite credenciais sequencialmente. Prepara colateral para Plutus V3, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retentativas automaticas com intervalos crescentes (5 tentativas, inicio em 40s, dobrando a cada vez). |
