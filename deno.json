@@ -12,7 +12,9 @@
     "issue-celula-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write src/cli/issue.ts celula",
     "issue-pack-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write src/cli/issue.ts pack",
     "issue-reciclagem-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write src/cli/issue.ts reciclagem",
-    "test": "deno test --allow-env --allow-read --allow-write --allow-net"
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net",
+    "test-2-users": "deno run --allow-net --allow-env --allow-read --allow-write src/test-2-users.ts",
+    "test-5-students": "deno run --allow-net --allow-env --allow-read --allow-write src/test-5-students.ts"
   },
   "imports": {
     "@evolution-sdk/evolution": "npm:@evolution-sdk/evolution@~0.5.9",

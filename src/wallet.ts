@@ -5,7 +5,7 @@
  *   - BIP-39 mnemonic generation (PrivateKey.generateMnemonic)
  *   - Enterprise address derivation (Address.fromSeed)
  *   - CIP-1852 key derivation (PrivateKey.fromMnemonicCardano)
- *   - Transaction signing via Client (client.signTx → TransactionWitnessSet)
+ *   - Manual transaction signing (extract body → blake2b-256 → Ed25519 sign → VKeyWitness)
  *   - CIP-8 message signing via COSE (COSE.SignData.signData)
  *   - Transaction building & submission via Client (client.newTx)
  *
@@ -18,8 +18,11 @@ import {
   COSE,
   preprod,
   PrivateKey,
+  Transaction,
   TransactionWitnessSet,
+  VKey,
 } from "@evolution-sdk/evolution";
+import { blake2b } from "npm:@noble/hashes@1/blake2b";
 import type { ActorName, ActorWallet } from "./types.ts";
 
 /** Convert Uint8Array to hex string. */
@@ -27,6 +30,15 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/** Convert hex string to Uint8Array. */
+function fromHex(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes;
 }
 
 /**
@@ -39,9 +51,12 @@ export function generateMnemonic(): string {
 /**
  * Create an ActorWallet with signing callbacks for UVerify.
  *
- * Uses a hybrid approach:
- *   - signTx:      Delegates to the evolution-sdk SigningClient (handles key
- *                   derivation, body hashing, witness set creation internally).
+ * Uses manual witness construction for signTx:
+ *   - signTx:      Extracts the transaction body bytes from the unsigned CBOR,
+ *                   hashes with blake2b-256, signs with the payment private key,
+ *                   and constructs a VKeyWitness directly. This avoids the issue
+ *                   where Client.signTx() produces empty/malformed witness sets
+ *                   for externally-built transactions (e.g. UVerify collateral).
  *   - signMessage:  Uses COSE.SignData.signData() directly with the derived
  *                   private key. This produces the CIP-8 DataSignature format
  *                   ({ key: CBOR(COSE_Key), signature: CBOR(COSE_Sign1) })
@@ -78,10 +93,32 @@ export async function createActorWallet(
     index: 0,
   });
 
-  // signTx: Sign a UVerify-built unsigned transaction.
-  // Delegates to the Client which handles body hashing and witness set creation.
+  // Derive the public verification key from the payment private key.
+  const vkey = VKey.fromPrivateKey(paymentKey);
+
+  // signTx: Manual witness construction for externally-built transactions.
+  // Extracts the body bytes from the unsigned CBOR, hashes with blake2b-256,
+  // signs with the payment key, and constructs a proper VKeyWitness.
+  // This replaces Client.signTx() which produces malformed witnesses for
+  // transactions built by external services (UVerify collateral endpoint).
   const signTx = async (unsignedCborHex: string): Promise<string> => {
-    const witnessSet = await client.signTx(unsignedCborHex);
+    // Convert hex to bytes.
+    const txBytes = fromHex(unsignedCborHex);
+
+    // Extract the raw body bytes (preserving exact CBOR encoding).
+    const bodyBytes = Transaction.extractBodyBytes(txBytes);
+
+    // Hash the body with blake2b-256 (Cardano's transaction body hash).
+    const bodyHash = blake2b(bodyBytes, { dkLen: 32 });
+
+    // Sign the body hash with the payment private key (Ed25519).
+    const signature = PrivateKey.sign(paymentKey, bodyHash);
+
+    // Construct a witness set with a single VKeyWitness.
+    const witnessSet = TransactionWitnessSet.fromVKeyWitnesses([
+      new TransactionWitnessSet.VKeyWitness({ vkey, signature }),
+    ]);
+
     return TransactionWitnessSet.toCBORHex(witnessSet);
   };
 
