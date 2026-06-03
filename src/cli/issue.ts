@@ -1,14 +1,14 @@
 /**
- * CLI: deno task issue-<actor>
+ * CLI: deno task issue-<ator>
  *
- * Issues a single actor's credential, reading prerequisites from .env
- * and saving results back to .env.
+ * Emite a credencial de um único ator, lendo pré-requisitos do .env
+ * e salvando os resultados de volta no .env.
  *
- * Usage:
- *   deno task issue-origem       # Actor 1 — no prerequisites
- *   deno task issue-celula       # Actor 2 — requires ATOR1_TX in .env
- *   deno task issue-pack         # Actor 3 — requires ATOR2_TX in .env
- *   deno task issue-reciclagem   # Actor 4 — requires ATOR1_TX, ATOR2_TX, ATOR3_TX
+ * Uso:
+ *   deno task issue-origem       # Ator 1 — sem pré-requisitos
+ *   deno task issue-celula       # Ator 2 — requer ATOR1_TX no .env
+ *   deno task issue-pack         # Ator 3 — requer ATOR2_TX no .env
+ *   deno task issue-reciclagem   # Ator 4 — requer ATOR1_TX, ATOR2_TX, ATOR3_TX
  */
 
 import { loadConfig } from "../config.ts";
@@ -23,7 +23,7 @@ import type { ActorName } from "../types.ts";
 import { ACTOR_ENV_KEY } from "../types.ts";
 import { createActorWallet } from "../wallet.ts";
 
-/** Map actor name → actor number for .env variable naming. */
+/** Mapeia nome do ator → número do ator para nomenclatura de variáveis .env. */
 const ACTOR_NUMBERS: Record<ActorName, string> = {
   origem: "1",
   celula: "2",
@@ -31,7 +31,7 @@ const ACTOR_NUMBERS: Record<ActorName, string> = {
   reciclagem: "4",
 };
 
-/** Prerequisites: which ATOR*_TX vars must exist before issuing each actor. */
+/** Pré-requisitos: quais variáveis ATOR*_TX devem existir antes de emitir cada ator. */
 const PREREQUISITES: Record<ActorName, string[]> = {
   origem: [],
   celula: ["ATOR1_TX"],
@@ -39,7 +39,7 @@ const PREREQUISITES: Record<ActorName, string[]> = {
   reciclagem: ["ATOR1_TX", "ATOR2_TX", "ATOR3_TX"],
 };
 
-/** Friendly names for the next step hint. */
+/** Nomes amigáveis para a dica do próximo passo. */
 const NEXT_STEP: Record<ActorName, string> = {
   origem: "deno task issue-celula",
   celula: "deno task issue-pack",
@@ -60,22 +60,23 @@ function usage(): never {
 }
 
 /**
- * Main issue entry point.
+ * Ponto de entrada principal da emissão.
  *
- * Parses the actor name from CLI args, loads config, checks prerequisites
- * (previous actors must be issued first), recreates the actor's wallet from
- * the stored mnemonic, builds the DPP payload, and issues the credential.
+ * Analisa o nome do ator dos argumentos CLI, carrega a configuração, verifica
+ * pré-requisitos (atores anteriores devem ser emitidos primeiro), recria a
+ * carteira do ator a partir do mnemonic armazenado, constrói o payload DPP
+ * e emite a credencial.
  *
- * Emission mode is determined by EMISSION_MODE in .env (or env var override):
- *   - "uverify" (default): issues via UVerify SDK + Plutus V3 smart contracts
- *   - "metadata": issues via native Cardano metadata (label 1990)
+ * O modo de emissão é determinado por EMISSION_MODE no .env (ou override via variável de ambiente):
+ *   - "uverify" (padrão): emite via SDK UVerify + contratos inteligentes Plutus V3
+ *   - "metadata": emite via metadados nativos Cardano (label 1990)
  *
- * Results (tx_hash, data_hash) are saved to .env for the next step.
- * For the pack actor, also saves TX_HASH_PACK and DATA_HASH_PACK
- * which are used by `deno task verify`.
+ * Os resultados (tx_hash, data_hash) são salvos no .env para o próximo passo.
+ * Para o ator pack, também salva TX_HASH_PACK e DATA_HASH_PACK
+ * que são usados pelo `deno task verify`.
  */
 async function main(): Promise<void> {
-  // ── Parse actor name from CLI args ────────────────────────────
+  // ── Analisar nome do ator dos argumentos CLI ────────────────────────────
   const actorArg = Deno.args[0]?.trim().toLowerCase();
   if (!actorArg || !VALID_ACTORS.includes(actorArg as ActorName)) {
     console.error(`Error: Invalid or missing actor name: "${actorArg}"`);
@@ -88,7 +89,7 @@ async function main(): Promise<void> {
   console.log(`Cardano DPP Passaport — Issue credential: ${actor} (Ator ${num})`);
   console.log("=".repeat(64));
 
-  // ── Load configuration ────────────────────────────────────────
+  // ── Carregar configuração ────────────────────────────────────────
   console.log("\nLoading configuration...");
   let config;
   try {
@@ -100,7 +101,7 @@ async function main(): Promise<void> {
     Deno.exit(1);
   }
 
-  // ── Check prerequisites ───────────────────────────────────────
+  // ── Verificar pré-requisitos ───────────────────────────────────────
   const prereqs = PREREQUISITES[actor];
   for (const key of prereqs) {
     const val = readEnvVar(key);
@@ -119,7 +120,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── Load actor mnemonic from .env ─────────────────────────────
+  // ── Carregar mnemonic do ator do .env ─────────────────────────────
   const mnemonicKey = `ATOR${num}_MNEMONIC`;
   const mnemonic = readEnvVar(mnemonicKey);
   if (!mnemonic) {
@@ -128,7 +129,7 @@ async function main(): Promise<void> {
     Deno.exit(1);
   }
 
-  // ── Recreate the actor's wallet from stored mnemonic ──────────
+  // ── Recriar a carteira do ator a partir do mnemonic armazenado ──────────
   console.log(`\nRecreating wallet for ${actor} from stored mnemonic...`);
   const blockfrostConfig = {
     baseUrl: config.blockfrostBaseUrl,
@@ -137,10 +138,10 @@ async function main(): Promise<void> {
   const wallet = await createActorWallet(actor, mnemonic, blockfrostConfig);
   console.log(`  Address: ${wallet.address}`);
 
-  // ── Build PayloadEnv from stored tx hashes ────────────────────
+  // ── Construir PayloadEnv a partir dos hashes de tx armazenados ────────────────────
   const env: PayloadEnv = await buildPayloadEnv(config.mainWalletMnemonic);
 
-  // Load previously issued tx hashes into the env.
+  // Carrega hashes de tx emitidos anteriormente no env.
   const ator1Tx = readEnvVar("ATOR1_TX");
   const ator2Tx = readEnvVar("ATOR2_TX");
   const ator3Tx = readEnvVar("ATOR3_TX");
@@ -148,23 +149,23 @@ async function main(): Promise<void> {
   if (ator2Tx) env.ator2Tx = ator2Tx;
   if (ator3Tx) env.ator3Tx = ator3Tx;
 
-  // ── Issue the credential ──────────────────────────────────────
+  // ── Emitir a credencial ──────────────────────────────────────
   const result = config.emissionMode === "metadata"
     ? await issueCredentialDireto(config, wallet, env)
     : await issueCredential(config, wallet, env);
 
-  // ── Save results to .env ──────────────────────────────────────
+  // ── Salvar resultados no .env ──────────────────────────────────
   const txKey = ACTOR_ENV_KEY[actor];
   appendToEnv(txKey, result.txHash);
   appendToEnv(`DATA_HASH_ATOR${num}`, result.dataHash);
 
-  // For pack, also save TX_HASH_PACK and DATA_HASH_PACK (used by verify).
+  // Para pack, também salva TX_HASH_PACK e DATA_HASH_PACK (usados pelo verify).
   if (actor === "pack") {
     appendToEnv("TX_HASH_PACK", result.txHash);
     appendToEnv("DATA_HASH_PACK", result.dataHash);
   }
 
-  // ── Print result ──────────────────────────────────────────────
+  // ── Imprimir resultado ──────────────────────────────────────────────
   console.log("\n" + "=".repeat(64));
   console.log(`CREDENTIAL ISSUED — ${actor} (Ator ${num}) [${config.emissionMode}]`);
   console.log("=".repeat(64));
@@ -187,7 +188,7 @@ async function main(): Promise<void> {
   }
   console.log(`\nNext step: ${NEXT_STEP[actor]}`);
 
-  // ── Generate emission receipt ──────────────────────────────────
+  // ── Gerar recibo de emissão ──────────────────────────────────
   console.log("\nGenerating emission receipt...");
   const receiptPayload = (await PAYLOAD_BUILDERS[actor](env)).payload;
   await openEmissionReceipt({
@@ -197,7 +198,7 @@ async function main(): Promise<void> {
     dataHash: result.dataHash,
   });
 
-  // For reciclagem, also generate the recycling report.
+  // Para reciclagem, também gera o relatório de reciclagem.
   if (actor === "reciclagem") {
     await new Promise((r) => setTimeout(r, 500));
     console.log("Generating reciclagem report...");

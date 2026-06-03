@@ -1,22 +1,22 @@
 /**
- * Environment configuration — loads and validates .env variables.
+ * Configuração de ambiente — carrega e valida variáveis .env.
  */
 
 import "@std/dotenv/load";
 import type { EmissionMode, PipelineConfig } from "./types.ts";
 
 /**
- * Load and validate pipeline configuration from .env variables.
+ * Carrega e valida a configuração do pipeline a partir das variáveis .env.
  *
- * Required variables:
- *   - BLOCKFROST_PROJECT_ID: Blockfrost API key for preprod (rejects placeholder and mainnet keys)
- *   - WALLET_MNEMONIC: 24-word BIP-39 mnemonic for the main funding wallet
+ * Variáveis obrigatórias:
+ *   - BLOCKFROST_PROJECT_ID: chave de API Blockfrost para preprod (rejeita placeholders e chaves de mainnet)
+ *   - WALLET_MNEMONIC: mnemonic BIP-39 de 24 palavras para a carteira principal de financiamento
  *
- * Optional variables:
- *   - UVERIFY_API_URL: UVerify API base URL (defaults to preprod)
- *   - EMISSION_MODE: "uverify" (default) or "metadata"
+ * Variáveis opcionais:
+ *   - UVERIFY_API_URL: URL base da API UVerify (padrão: preprod)
+ *   - EMISSION_MODE: "uverify" (padrão) ou "metadata"
  *
- * Throws descriptive errors if required variables are missing or invalid.
+ * Lança erros descritivos se variáveis obrigatórias estiverem ausentes ou inválidas.
  */
 export function loadConfig(): PipelineConfig {
   const blockfrostProjectId = Deno.env.get("BLOCKFROST_PROJECT_ID")?.trim();

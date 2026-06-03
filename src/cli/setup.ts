@@ -1,15 +1,15 @@
 /**
  * CLI: deno task setup
  *
- * Runs Steps 0-3 of the pipeline:
- *   1. Load config from .env
- *   2. Generate 4 actor wallets (mnemonics + Enterprise addresses)
- *   3. Save all 4 mnemonics and addresses to .env
- *   4. Fund all 4 wallets with a single transaction
- *   5. Wait for funding confirmation
- *   6. Print summary
+ * Executa as Etapas 0-3 do pipeline:
+ *   1. Carregar configuração do .env
+ *   2. Gerar 4 carteiras de atores (mnemonics + Enterprise addresses)
+ *   3. Salvar todos os 4 mnemonics e endereços no .env
+ *   4. Financiar todas as 4 carteiras com uma única transação
+ *   5. Aguardar confirmação do financiamento
+ *   6. Imprimir resumo
  *
- * After running this, use `deno task issue-origem` etc. one at a time.
+ * Após executar isso, use `deno task issue-origem` etc. um de cada vez.
  */
 
 import { loadConfig } from "../config.ts";
@@ -21,25 +21,25 @@ import { ACTOR_ORDER } from "../types.ts";
 import { createActorWallet, generateMnemonic } from "../wallet.ts";
 
 /**
- * Main setup entry point.
+ * Ponto de entrada principal do setup.
  *
- * Executes Steps 0-3 of the DPP pipeline:
- *   Step 0: Load and validate .env configuration
- *   Step 1: Generate 4 BIP-39 mnemonics, derive Enterprise addresses,
- *           save all mnemonics and addresses to .env
- *   Step 2: Build and submit a single funding tx (4 x 50 ADA)
- *   Step 3: Wait for funding confirmation + 15s UTxO propagation buffer
+ * Executa as Etapas 0-3 do pipeline DPP:
+ *   Etapa 0: Carregar e validar configuração .env
+ *   Etapa 1: Gerar 4 mnemonics BIP-39, derivar Enterprise addresses,
+ *            salvar todos os mnemonics e endereços no .env
+ *   Etapa 2: Construir e submeter uma única tx de financiamento (4 x 50 ADA)
+ *   Etapa 3: Aguardar confirmação do financiamento + buffer de 15s para propagação de UTxO
  *
- * After this completes, the user can issue credentials one at a time
- * using `deno task issue-origem`, `deno task issue-celula`, etc.
- * This command is the same for both emission modes (uverify and metadata).
+ * Após a conclusão, o usuário pode emitir credenciais uma de cada vez
+ * usando `deno task issue-origem`, `deno task issue-celula`, etc.
+ * Este comando é o mesmo para ambos os modos de emissão (uverify e metadata).
  */
 async function main(): Promise<void> {
   console.log("=".repeat(64));
   console.log("Cardano DPP Passaport — Setup (wallets + funding)");
   console.log("=".repeat(64));
 
-  // ── STEP 0: Load configuration ──────────────────────────────────
+  // ── ETAPA 0: Carregar configuração ──────────────────────────────────
   console.log("\n--- STEP 0: Load configuration ---");
   let config: PipelineConfig;
   try {
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     `Mnemonic:   ${config.mainWalletMnemonic.split(" ").slice(0, 3).join(" ")}...`,
   );
 
-  // ── STEP 1: Generate 4 actor wallets ────────────────────────────
+  // ── ETAPA 1: Gerar 4 carteiras de atores ────────────────────────────
   console.log("\n--- STEP 1: Generate actor wallets ---");
 
   const blockfrostConfig = {
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
 
     const num = ACTOR_ENV_NUMBERS[name];
 
-    // Save mnemonic and address to .env with actor description
+    // Salva mnemonic e endereço no .env com descrição do ator
     appendCommentToEnv(ACTOR_DESCRIPTIONS[name]);
     appendToEnv(`ATOR${num}_MNEMONIC`, mnemonic);
     appendToEnv(`ATOR${num}_ADDRESS`, wallet.address);
@@ -97,23 +97,23 @@ async function main(): Promise<void> {
     console.log(`    Saved to .env: ATOR${num}_MNEMONIC, ATOR${num}_ADDRESS`);
   }
 
-  // ── STEP 2: Fund actor wallets ──────────────────────────────────
+  // ── ETAPA 2: Financiar carteiras dos atores ──────────────────────────────────
   const fundingTxHash = await fundActorWallets(
     config,
     ACTOR_ORDER.map((n) => wallets[n]),
   );
 
-  // Save funding tx hash
+  // Salva o hash da tx de financiamento
   appendToEnv("FUNDING_TX", fundingTxHash);
 
-  // ── STEP 3: Wait for funding confirmation ───────────────────────
+  // ── ETAPA 3: Aguardar confirmação do financiamento ───────────────────────
   await waitForConfirmation(config, fundingTxHash);
 
-  // Extra buffer for UTxO propagation.
+  // Buffer extra para propagação de UTxO.
   console.log("Waiting 15s for UTxO propagation...");
   await new Promise((r) => setTimeout(r, 15_000));
 
-  // ── Summary ─────────────────────────────────────────────────────
+  // ── Resumo ─────────────────────────────────────────────────────
   console.log("\n" + "=".repeat(64));
   console.log("SETUP COMPLETE");
   console.log("=".repeat(64));
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
   console.log("\nAll mnemonics and addresses saved to .env");
   console.log("Next step: deno task issue-origem");
 
-  // ── Generate setup receipt ───────────────────────────────────────
+  // ── Gerar recibo de setup ───────────────────────────────────────
   console.log("\nGenerating setup receipt...");
   await openSetupReceipt({
     wallets,

@@ -1,13 +1,13 @@
 /**
- * Direct metadata credential issuance — no smart contracts.
+ * Emissão de credenciais com metadados diretos — sem contratos inteligentes.
  *
- * Builds transactions with DPP payloads as native Cardano metadata
- * under label 1990. Only the network fee is paid; change goes back
- * to the issuing wallet. Uses the evolution-sdk Client for
- * transaction building and Blockfrost for confirmation polling.
+ * Constrói transações com payloads DPP como metadados nativos Cardano
+ * sob o label 1990. Apenas a taxa de rede é paga; o troco volta para
+ * a carteira emissora. Usa o Client do evolution-sdk para
+ * construção de transações e Blockfrost para polling de confirmação.
  *
- * Analogous to the Python `emissor_direto.py` — writes the full
- * credential payload directly into the transaction metadata.
+ * Análogo ao Python `emissor_direto.py` — grava o payload completo
+ * da credencial diretamente nos metadados da transação.
  */
 
 import {
@@ -25,25 +25,25 @@ import type {
   PipelineConfig,
 } from "./types.ts";
 
-/** Metadata label for DPP credentials (matches Python implementation). */
+/** Label de metadados para credenciais DPP (corresponde à implementação Python). */
 const METADATA_LABEL = 1990n;
 
-/** Maximum text length for a single Cardano metadata string (64 bytes). */
+/** Comprimento máximo de texto para uma única string de metadados Cardano (64 bytes). */
 const MAX_TEXT_BYTES = 64;
 
 const MAX_ATTEMPTS = 5;
 const INITIAL_DELAY_MS = 10_000;
 
 /**
- * Split a string into chunks that fit within the 64-byte metadata text limit.
+ * Divide uma string em pedaços que cabem no limite de 64 bytes de texto de metadados.
  *
- * Cardano native metadata text fields are limited to 64 bytes per the
- * ledger spec. Values longer than 64 bytes (e.g. long issuer names,
- * data hashes) must be split into an array of chunks. The verifier
- * reassembles them by joining the array elements.
+ * Campos de texto de metadados nativos Cardano são limitados a 64 bytes pela
+ * especificação do ledger. Valores maiores que 64 bytes (ex: nomes longos de emissores,
+ * hashes de dados) devem ser divididos em um array de pedaços. O verificador
+ * remonta juntando os elementos do array.
  *
- * Uses a byte-aware approach: trims from the end character by character
- * until the UTF-8 encoded slice fits within 64 bytes.
+ * Usa uma abordagem consciente de bytes: corta do final caractere por caractere
+ * até que a fatia codificada em UTF-8 caiba em 64 bytes.
  */
 function chunkString(value: string): string[] {
   const encoder = new TextEncoder();
@@ -53,7 +53,7 @@ function chunkString(value: string): string[] {
   const chunks: string[] = [];
   let offset = 0;
   while (offset < value.length) {
-    // Start with the full remaining string, trim until it fits
+    // Começa com a string restante completa, corta até caber
     let end = value.length;
     while (end > offset) {
       const slice = value.slice(offset, end);
@@ -69,10 +69,10 @@ function chunkString(value: string): string[] {
 }
 
 /**
- * Convert a DppPayload (Record<string, string>) to a TransactionMetadatum Map.
+ * Converte um DppPayload (Record<string, string>) para um Map de TransactionMetadatum.
  *
- * Handles the 64-byte text limit by chunking long values into arrays.
- * Keys are always short enough (<64 bytes) so they don't need chunking.
+ * Trata o limite de 64 bytes de texto dividindo valores longos em arrays.
+ * As chaves são sempre curtas o suficiente (<64 bytes) e não precisam de divisão.
  */
 function payloadToMetadatum(
   payload: DppPayload,
@@ -93,11 +93,11 @@ function payloadToMetadatum(
 }
 
 /**
- * Wait for a transaction to be confirmed on-chain via Blockfrost.
+ * Aguarda a confirmação de uma transação on-chain via Blockfrost.
  *
- * Polls GET /txs/{txHash} every 5 seconds until Blockfrost returns
- * HTTP 200 (tx is on-chain) or the timeout expires (default 90s).
- * Used for metadata-mode transactions which don't go through UVerify.
+ * Consulta GET /txs/{txHash} a cada 5 segundos até que o Blockfrost retorne
+ * HTTP 200 (tx está on-chain) ou o timeout expire (padrão 90s).
+ * Usado para transações no modo metadata que não passam pelo UVerify.
  */
 async function waitForBlockfrostConfirmation(
   config: PipelineConfig,
@@ -116,7 +116,7 @@ async function waitForBlockfrostConfirmation(
       );
       if (resp.ok) return true;
     } catch {
-      // Network error — retry
+      // Erro de rede — tentar novamente
     }
     await new Promise((r) => setTimeout(r, 5_000));
   }
@@ -124,10 +124,10 @@ async function waitForBlockfrostConfirmation(
 }
 
 /**
- * Issue a single credential for one actor using direct native metadata.
+ * Emite uma única credencial para um ator usando metadados nativos diretos.
  *
- * Builds a metadata-only transaction (pays only the network fee; change
- * goes back to the issuing wallet) with the DPP payload under label 1990.
+ * Constrói uma transação somente com metadados (paga apenas a taxa de rede; o troco
+ * volta para a carteira emissora) com o payload DPP sob o label 1990.
  */
 export async function issueCredentialDireto(
   config: PipelineConfig,
@@ -137,20 +137,20 @@ export async function issueCredentialDireto(
   const actor = wallet.name;
   console.log(`\n  Issuing credential for ${actor} (direct metadata)...`);
 
-  // 1. Build the DPP payload.
+  // 1. Constrói o payload DPP.
   const { payload, serial, gtin } = await PAYLOAD_BUILDERS[actor](env);
 
-  // 2. Compute the data_hash (product fingerprint).
+  // 2. Calcula o data_hash (impressão digital do produto).
   const hash = await dataHash(gtin, serial);
   console.log(`  data_hash: ${hash}`);
 
-  // Include data_hash in the on-chain metadata for cross-referencing.
+  // Inclui data_hash nos metadados on-chain para referência cruzada.
   payload["data_hash"] = hash;
 
-  // 3. Convert payload to TransactionMetadatum.
+  // 3. Converte o payload para TransactionMetadatum.
   const metadatumMap = payloadToMetadatum(payload);
 
-  // 4. Build, sign, and submit with retry.
+  // 4. Constrói, assina e submete com retentativa.
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -170,7 +170,7 @@ export async function issueCredentialDireto(
 
       console.log(`  tx_hash: ${txHash}`);
 
-      // Wait for on-chain confirmation.
+      // Aguarda confirmação on-chain.
       console.log("  Waiting for on-chain confirmation...");
       const confirmed = await waitForBlockfrostConfirmation(config, txHash);
       if (confirmed) {
@@ -183,7 +183,7 @@ export async function issueCredentialDireto(
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
 
-      // Fatal: no UTXOs — wallet is empty.
+      // Fatal: sem UTXOs — carteira vazia.
       if (lastError.message.toLowerCase().includes("no utxos found")) {
         throw lastError;
       }
@@ -208,15 +208,15 @@ export async function issueCredentialDireto(
 }
 
 /**
- * Issue credentials for all 4 actors sequentially using direct metadata.
+ * Emite credenciais para todos os 4 atores sequencialmente usando metadados diretos.
  *
- * Issuance order: origem → celula → pack → reciclagem.
- * Same sequential dependency as issueAllCredentials in issuer.ts:
- * each actor references the previous actor's txHash (ref_*_tx fields),
- * so parallel issuance is not possible. The PayloadEnv is updated after
- * each issuance with the resulting txHash so the next actor can reference it.
+ * Ordem de emissão: origem → celula → pack → reciclagem.
+ * Mesma dependência sequencial de issueAllCredentials em issuer.ts:
+ * cada ator referencia o txHash do ator anterior (campos ref_*_tx),
+ * portanto a emissão paralela não é possível. O PayloadEnv é atualizado após
+ * cada emissão com o txHash resultante para que o próximo ator possa referenciá-lo.
  *
- * Used by main.ts when EMISSION_MODE=metadata.
+ * Usado por main.ts quando EMISSION_MODE=metadata.
  */
 export async function issueAllCredentialsDireto(
   config: PipelineConfig,
@@ -226,22 +226,22 @@ export async function issueAllCredentialsDireto(
   console.log("\n--- STEP 4: Issue credentials (direct metadata) ---");
   const results: IssuanceResult[] = [];
 
-  // Actor 1: Origem (no references)
+  // Ator 1: Origem (sem referências)
   const r1 = await issueCredentialDireto(config, wallets.origem, env);
   env.ator1Tx = r1.txHash;
   results.push(r1);
 
-  // Actor 2: Celula (references Actor 1)
+  // Ator 2: Célula (referencia o Ator 1)
   const r2 = await issueCredentialDireto(config, wallets.celula, env);
   env.ator2Tx = r2.txHash;
   results.push(r2);
 
-  // Actor 3: Pack (references Actor 2)
+  // Ator 3: Pack (referencia o Ator 2)
   const r3 = await issueCredentialDireto(config, wallets.pack, env);
   env.ator3Tx = r3.txHash;
   results.push(r3);
 
-  // Actor 4: Reciclagem (references Actors 1, 2, 3)
+  // Ator 4: Reciclagem (referencia os Atores 1, 2, 3)
   const r4 = await issueCredentialDireto(config, wallets.reciclagem, env);
   results.push(r4);
 

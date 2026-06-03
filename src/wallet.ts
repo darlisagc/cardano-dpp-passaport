@@ -1,15 +1,15 @@
 /**
- * Wallet generation, key derivation, and signing callbacks.
+ * Geração de carteiras, derivação de chaves e callbacks de assinatura.
  *
- * Uses @evolution-sdk/evolution for:
- *   - BIP-39 mnemonic generation (PrivateKey.generateMnemonic)
- *   - Enterprise address derivation (Address.fromSeed)
- *   - CIP-1852 key derivation (PrivateKey.fromMnemonicCardano)
- *   - Manual transaction signing (extract body → blake2b-256 → Ed25519 sign → VKeyWitness)
- *   - CIP-8 message signing via COSE (COSE.SignData.signData)
- *   - Transaction building & submission via Client (client.newTx)
+ * Usa @evolution-sdk/evolution para:
+ *   - Geração de mnemonic BIP-39 (PrivateKey.generateMnemonic)
+ *   - Derivação de Enterprise address (Address.fromSeed)
+ *   - Derivação de chaves CIP-1852 (PrivateKey.fromMnemonicCardano)
+ *   - Assinatura manual de transações (extrair body → blake2b-256 → assinar Ed25519 → VKeyWitness)
+ *   - Assinatura de mensagens CIP-8 via COSE (COSE.SignData.signData)
+ *   - Construção e submissão de transações via Client (client.newTx)
  *
- * Each actor gets their own mnemonic and Enterprise address.
+ * Cada ator recebe seu próprio mnemonic e Enterprise address.
  */
 
 import {
@@ -25,14 +25,14 @@ import {
 import { blake2b } from "npm:@noble/hashes@1/blake2b";
 import type { ActorName, ActorWallet } from "./types.ts";
 
-/** Convert Uint8Array to hex string. */
+/** Converte Uint8Array para string hexadecimal. */
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-/** Convert hex string to Uint8Array. */
+/** Converte string hexadecimal para Uint8Array. */
 function fromHex(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
@@ -42,36 +42,36 @@ function fromHex(hex: string): Uint8Array {
 }
 
 /**
- * Generate a new 24-word BIP-39 mnemonic (256-bit entropy).
+ * Gera um novo mnemonic BIP-39 de 24 palavras (256 bits de entropia).
  */
 export function generateMnemonic(): string {
   return PrivateKey.generateMnemonic(256);
 }
 
 /**
- * Create an ActorWallet with signing callbacks for UVerify.
+ * Cria uma ActorWallet com callbacks de assinatura para o UVerify.
  *
- * Uses manual witness construction for signTx:
- *   - signTx:      Extracts the transaction body bytes from the unsigned CBOR,
- *                   hashes with blake2b-256, signs with the payment private key,
- *                   and constructs a VKeyWitness directly. This avoids the issue
- *                   where Client.signTx() produces empty/malformed witness sets
- *                   for externally-built transactions (e.g. UVerify collateral).
- *   - signMessage:  Uses COSE.SignData.signData() directly with the derived
- *                   private key. This produces the CIP-8 DataSignature format
+ * Usa construção manual de testemunhas para signTx:
+ *   - signTx:      Extrai os bytes do corpo da transação do CBOR não assinado,
+ *                   faz hash com blake2b-256, assina com a chave privada de pagamento,
+ *                   e constrói um VKeyWitness diretamente. Isso evita o problema
+ *                   onde Client.signTx() produz conjuntos de testemunhas vazios/malformados
+ *                   para transações construídas externamente (ex: colateral do UVerify).
+ *   - signMessage:  Usa COSE.SignData.signData() diretamente com a chave privada
+ *                   derivada. Isso produz o formato CIP-8 DataSignature
  *                   ({ key: CBOR(COSE_Key), signature: CBOR(COSE_Sign1) })
- *                   that UVerify expects.
+ *                   que o UVerify espera.
  *
- * The two signing approaches are necessary because the Client's signMessage
- * returns the wallet-level SignedMessage format, while UVerify expects the
- * CIP-30 DataSignature format with { key, signature } hex strings.
+ * As duas abordagens de assinatura são necessárias porque o signMessage do Client
+ * retorna o formato SignedMessage em nível de carteira, enquanto o UVerify espera o
+ * formato CIP-30 DataSignature com strings hex { key, signature }.
  */
 export async function createActorWallet(
   name: ActorName,
   mnemonic: string,
   blockfrostConfig: { baseUrl: string; projectId: string },
 ): Promise<ActorWallet> {
-  // Create a full SigningClient for transaction signing.
+  // Cria um SigningClient completo para assinatura de transações.
   const client = Client.make(preprod)
     .withBlockfrost(blockfrostConfig)
     .withSeed({
@@ -80,41 +80,41 @@ export async function createActorWallet(
       addressType: "Enterprise",
     });
 
-  // Get the derived Enterprise address.
+  // Obtém o Enterprise address derivado.
   const addr = await client.address();
   const addressBech32 = Address.toBech32(addr);
   const addressHex = Address.toHex(addr);
 
-  // Derive the payment private key for CIP-8 message signing.
-  // Path: m/1852'/1815'/0'/0/0 (CIP-1852 standard payment key).
+  // Deriva a chave privada de pagamento para assinatura de mensagens CIP-8.
+  // Caminho: m/1852'/1815'/0'/0/0 (chave de pagamento padrão CIP-1852).
   const paymentKey = PrivateKey.fromMnemonicCardano(mnemonic, {
     account: 0,
-    role: 0, // payment
+    role: 0, // pagamento
     index: 0,
   });
 
-  // Derive the public verification key from the payment private key.
+  // Deriva a chave pública de verificação a partir da chave privada de pagamento.
   const vkey = VKey.fromPrivateKey(paymentKey);
 
-  // signTx: Manual witness construction for externally-built transactions.
-  // Extracts the body bytes from the unsigned CBOR, hashes with blake2b-256,
-  // signs with the payment key, and constructs a proper VKeyWitness.
-  // This replaces Client.signTx() which produces malformed witnesses for
-  // transactions built by external services (UVerify collateral endpoint).
+  // signTx: Construção manual de testemunhas para transações construídas externamente.
+  // Extrai os bytes do corpo do CBOR não assinado, faz hash com blake2b-256,
+  // assina com a chave de pagamento e constrói um VKeyWitness adequado.
+  // Substitui Client.signTx() que produz testemunhas malformadas para
+  // transações construídas por serviços externos (endpoint de colateral do UVerify).
   const signTx = async (unsignedCborHex: string): Promise<string> => {
-    // Convert hex to bytes.
+    // Converte hex para bytes.
     const txBytes = fromHex(unsignedCborHex);
 
-    // Extract the raw body bytes (preserving exact CBOR encoding).
+    // Extrai os bytes brutos do corpo (preservando a codificação CBOR exata).
     const bodyBytes = Transaction.extractBodyBytes(txBytes);
 
-    // Hash the body with blake2b-256 (Cardano's transaction body hash).
+    // Faz hash do corpo com blake2b-256 (hash do corpo da transação Cardano).
     const bodyHash = blake2b(bodyBytes, { dkLen: 32 });
 
-    // Sign the body hash with the payment private key (Ed25519).
+    // Assina o hash do corpo com a chave privada de pagamento (Ed25519).
     const signature = PrivateKey.sign(paymentKey, bodyHash);
 
-    // Construct a witness set with a single VKeyWitness.
+    // Constrói um conjunto de testemunhas com um único VKeyWitness.
     const witnessSet = TransactionWitnessSet.fromVKeyWitnesses([
       new TransactionWitnessSet.VKeyWitness({ vkey, signature }),
     ]);
@@ -122,9 +122,9 @@ export async function createActorWallet(
     return TransactionWitnessSet.toCBORHex(witnessSet);
   };
 
-  // signMessage: CIP-8 COSE message signing for UVerify state operations.
-  // Uses COSE.SignData.signData() directly to produce the CIP-30 DataSignature
-  // format that UVerify expects: { key: hex(COSE_Key), signature: hex(COSE_Sign1) }.
+  // signMessage: Assinatura de mensagens COSE CIP-8 para operações de estado do UVerify.
+  // Usa COSE.SignData.signData() diretamente para produzir o formato CIP-30 DataSignature
+  // que o UVerify espera: { key: hex(COSE_Key), signature: hex(COSE_Sign1) }.
   const signMessage = async (
     message: string,
   ): Promise<{ key: string; signature: string }> => {
@@ -140,9 +140,9 @@ export async function createActorWallet(
 }
 
 /**
- * Create an evolution-sdk SigningClient for the main wallet.
- * Used for the funding transfer (main wallet → actor wallets).
- * Uses default Base address type since the main wallet already has funds.
+ * Cria um SigningClient evolution-sdk para a carteira principal.
+ * Usado para a transferência de financiamento (carteira principal → carteiras dos atores).
+ * Usa o tipo de endereço Base padrão pois a carteira principal já possui fundos.
  */
 export function createMainWalletClient(
   mnemonic: string,
@@ -154,7 +154,7 @@ export function createMainWalletClient(
 }
 
 /**
- * Get the bech32 address of an evolution-sdk client.
+ * Obtém o endereço bech32 de um client evolution-sdk.
  */
 export async function getClientAddress(
   client: ReturnType<typeof createMainWalletClient>,

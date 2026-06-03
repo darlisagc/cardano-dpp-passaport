@@ -1,23 +1,23 @@
 /**
- * .env state persistence helpers.
+ * Utilitários de persistência de estado no .env.
  *
- * Reads and writes pipeline state (mnemonics, addresses, tx hashes)
- * to the .env file so that each CLI step can pick up where the
- * previous one left off.
+ * Lê e grava o estado do pipeline (mnemonics, endereços, hashes de tx)
+ * no arquivo .env para que cada etapa do CLI possa continuar de onde
+ * a etapa anterior parou.
  */
 
 const ENV_PATH = ".env";
 
 /**
- * Read a specific key from the .env file.
- * Returns undefined if the key is not found or the file doesn't exist.
+ * Lê uma chave específica do arquivo .env.
+ * Retorna undefined se a chave não for encontrada ou se o arquivo não existir.
  */
 export function readEnvVar(key: string): string | undefined {
-  // First check if it's already in the environment (loaded by @std/dotenv).
+  // Primeiro verifica se já está no ambiente (carregado pelo @std/dotenv).
   const fromEnv = Deno.env.get(key)?.trim();
   if (fromEnv) return fromEnv;
 
-  // Fall back to reading the file directly (for vars written after initial load).
+  // Fallback: lê o arquivo diretamente (para variáveis escritas após o carregamento inicial).
   try {
     const content = Deno.readTextFileSync(ENV_PATH);
     for (const line of content.split("\n")) {
@@ -30,13 +30,13 @@ export function readEnvVar(key: string): string | undefined {
       }
     }
   } catch {
-    // File doesn't exist yet — that's fine.
+    // Arquivo ainda não existe — tudo bem.
   }
   return undefined;
 }
 
 /**
- * Append a comment line to the .env file.
+ * Adiciona uma linha de comentário ao arquivo .env.
  */
 export function appendCommentToEnv(comment: string): void {
   let content: string;
@@ -47,7 +47,7 @@ export function appendCommentToEnv(comment: string): void {
     return;
   }
 
-  // Ensure there's a newline before appending.
+  // Garante que haja uma quebra de linha antes de adicionar.
   if (!content.endsWith("\n")) {
     content += "\n";
   }
@@ -56,22 +56,22 @@ export function appendCommentToEnv(comment: string): void {
 }
 
 /**
- * Append or update a key=value pair in the .env file.
+ * Adiciona ou atualiza um par chave=valor no arquivo .env.
  *
- * If the key already exists, its value is replaced in-place.
- * If the key doesn't exist, a new line is appended at the end.
- * Also updates the current process environment so subsequent
- * readEnvVar() calls return the new value without re-reading the file.
+ * Se a chave já existir, seu valor é substituído no local.
+ * Se a chave não existir, uma nova linha é adicionada ao final.
+ * Também atualiza o ambiente do processo atual para que chamadas
+ * subsequentes a readEnvVar() retornem o novo valor sem reler o arquivo.
  */
 export function appendToEnv(key: string, value: string): void {
-  // Update the process environment immediately.
+  // Atualiza o ambiente do processo imediatamente.
   Deno.env.set(key, value);
 
   let content: string;
   try {
     content = Deno.readTextFileSync(ENV_PATH);
   } catch {
-    // File doesn't exist — create it.
+    // Arquivo não existe — cria um novo.
     Deno.writeTextFileSync(ENV_PATH, `${key}=${value}\n`);
     return;
   }
@@ -92,7 +92,7 @@ export function appendToEnv(key: string, value: string): void {
   }
 
   if (!found) {
-    // Ensure there's a newline before appending.
+    // Garante que haja uma quebra de linha antes de adicionar.
     if (lines.length > 0 && lines[lines.length - 1]?.trim() !== "") {
       lines.push("");
     }

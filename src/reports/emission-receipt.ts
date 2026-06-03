@@ -1,10 +1,10 @@
 /**
- * HTML emission receipt — generated after each credential issuance.
+ * Recibo HTML de emissão — gerado após cada emissão de credencial.
  *
- * Generates a self-contained HTML page (receipt) showing the data of the
- * newly issued credential, with clickable Cexplorer preprod links.
+ * Gera uma página HTML autocontida (recibo) mostrando os dados da
+ * credencial recém-emitida, com links clicáveis para o Cexplorer preprod.
  *
- * Port of Python `RelatorioEmissaoHTML`.
+ * Porta do Python `RelatorioEmissaoHTML`.
  */
 
 import type { ActorName, DppPayload } from "../types.ts";
@@ -25,7 +25,7 @@ export interface EmissionReceiptInput {
   dataHash: string;
 }
 
-/** Generate the standard field rows (<dt>/<dd>) for the payload. */
+/** Gera as linhas de campos padrão (<dt>/<dd>) para o payload. */
 function buildFields(payload: DppPayload): string {
   const fieldMap: [string, string][] = [
     ["name", "Produto"],
@@ -51,7 +51,7 @@ function buildFields(payload: DppPayload): string {
   return items.join("\n");
 }
 
-/** Generate the materials section (mat_* fields). */
+/** Gera a seção de materiais (campos mat_*). */
 function buildMaterials(payload: DppPayload): string {
   const mats: [string, string][] = [];
   for (const [k, v] of Object.entries(payload)) {
@@ -79,7 +79,7 @@ function buildMaterials(payload: DppPayload): string {
   );
 }
 
-/** Generate the references section (ref_*_tx fields). */
+/** Gera a seção de referências (campos ref_*_tx). */
 function buildReferences(payload: DppPayload): string {
   const labelMap: Record<string, string> = {
     pack: "Pack",
@@ -119,7 +119,7 @@ function buildReferences(payload: DppPayload): string {
   );
 }
 
-/** Generate the self-contained HTML emission receipt. */
+/** Gera o recibo HTML autocontido de emissão. */
 export function generateEmissionReceipt(input: EmissionReceiptInput): string {
   const cfg = ACTOR_CONFIG[input.actor];
   const camposHtml = buildFields(input.payload);
@@ -185,7 +185,7 @@ ${materiaisHtml}${referenciasHtml}
 </html>`;
 }
 
-/** Generate and open the emission receipt in the browser. */
+/** Gera e abre o recibo de emissão no navegador. */
 export async function openEmissionReceipt(
   input: EmissionReceiptInput,
 ): Promise<string> {

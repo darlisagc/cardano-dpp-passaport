@@ -1,11 +1,11 @@
 /**
- * HTML verification report — full supply chain passport.
+ * Relatório HTML de verificação — passaporte completo da cadeia de suprimentos.
  *
- * Generates a self-contained HTML report showing all verified credentials
- * in the supply chain (origem -> celula -> pack -> optional reciclagem),
- * with supply chain flow diagram and color-coded cards.
+ * Gera um relatório HTML autocontido mostrando todas as credenciais verificadas
+ * na cadeia de suprimentos (origem -> celula -> pack -> reciclagem opcional),
+ * com diagrama de fluxo da cadeia e cards codificados por cores.
  *
- * Port of Python `RelatorioHTML`.
+ * Porta do Python `RelatorioHTML`.
  */
 
 import type { VerifiedCredential } from "../verify.ts";
@@ -28,7 +28,7 @@ export interface VerificationReportInput {
   reciclagem?: VerifiedCredential;
 }
 
-/** Generate the emission method badge. */
+/** Gera o badge do método de emissão. */
 function emissionBadge(metodo?: string): string {
   if (metodo === "metadata") {
     return `<span class="emission-badge metadata">${ICON_CHAIN_LINK}Metadata</span>`;
@@ -39,7 +39,7 @@ function emissionBadge(metodo?: string): string {
   return "";
 }
 
-/** Generate a single credential card. */
+/** Gera um card individual de credencial. */
 function buildCard(
   titulo: string,
   cred: VerifiedCredential | undefined,
@@ -120,7 +120,7 @@ function buildCard(
   );
 }
 
-/** Verification report stylesheet. */
+/** Folha de estilos do relatório de verificação. */
 function verificationStylesheet(): string {
   return `* {
     margin: 0;
@@ -470,11 +470,11 @@ body {
 }`;
 }
 
-/** Generate the self-contained HTML verification report. */
+/** Gera o relatório HTML autocontido de verificação. */
 export function generateVerificationReport(
   input: VerificationReportInput,
 ): string {
-  // Build cards
+  // Constrói os cards
   const cards: string[] = [];
   cards.push(
     buildCard("Origem (l\u00edtio)", input.origem, "#2e7d32", "origem"),
@@ -497,7 +497,7 @@ export function generateVerificationReport(
   }
   const cardsHtml = cards.join("\n");
 
-  // Build supply chain flow diagram
+  // Constrói o diagrama de fluxo da cadeia de suprimentos
   const flowSteps: [string, string][] = [
     ["origem", "Origem"],
     ["celula", "C&eacute;lula"],
@@ -565,7 +565,7 @@ ${cardsHtml}
 </html>`;
 }
 
-/** Generate and open the verification report in the browser. */
+/** Gera e abre o relatório de verificação no navegador. */
 export async function openVerificationReport(
   input: VerificationReportInput,
 ): Promise<string> {

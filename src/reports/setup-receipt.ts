@@ -1,9 +1,9 @@
 /**
- * HTML setup receipt — generated after wallet creation and funding.
+ * Recibo HTML de setup — gerado após criação das carteiras e financiamento.
  *
- * This is a NEW receipt type (no Python equivalent). Shows the created
- * wallets with addresses and masked mnemonics, plus the funding
- * transaction details.
+ * Este é um tipo NOVO de recibo (sem equivalente em Python). Mostra as carteiras
+ * criadas com endereços e mnemonics mascarados, além dos detalhes da
+ * transação de financiamento.
  */
 
 import type { ActorName, ActorWallet } from "../types.ts";
@@ -21,14 +21,14 @@ export interface SetupReceiptInput {
   adaPerWallet: number;
 }
 
-/** Mask a mnemonic: show first 3 words, replace rest with dots. */
+/** Mascara um mnemonic: mostra as 3 primeiras palavras, substitui o resto com reticências. */
 function maskMnemonic(mnemonic: string): string {
   const words = mnemonic.split(" ");
   if (words.length <= 3) return mnemonic;
   return words.slice(0, 3).join(" ") + " ...";
 }
 
-/** Actor display info for the table. */
+/** Informações de exibição dos atores para a tabela. */
 const ACTOR_DISPLAY: Record<
   ActorName,
   { num: string; label: string; company: string; color: string }
@@ -59,7 +59,7 @@ const ACTOR_DISPLAY: Record<
   },
 };
 
-/** Generate the self-contained HTML setup receipt. */
+/** Gera o recibo HTML autocontido de setup. */
 export function generateSetupReceipt(input: SetupReceiptInput): string {
   const esc = escapeHtml;
   const totalAda = input.adaPerWallet * ACTOR_ORDER.length;
@@ -69,7 +69,7 @@ export function generateSetupReceipt(input: SetupReceiptInput): string {
       ? input.fundingTxHash.slice(0, 20) + "..."
       : input.fundingTxHash;
 
-  // Build wallet table rows
+  // Constrói as linhas da tabela de carteiras
   const walletRows = ACTOR_ORDER.map((name) => {
     const w = input.wallets[name];
     const info = ACTOR_DISPLAY[name];
@@ -438,7 +438,7 @@ ${walletRows}
 </html>`;
 }
 
-/** Generate and open the setup receipt in the browser. */
+/** Gera e abre o recibo de setup no navegador. */
 export async function openSetupReceipt(
   input: SetupReceiptInput,
 ): Promise<string> {

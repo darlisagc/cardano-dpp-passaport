@@ -1,19 +1,19 @@
 /**
- * SHA-256 hashing helpers using Web Crypto API.
+ * Utilitários de hash SHA-256 usando a Web Crypto API.
  *
- * - dataHash(gtin, serial) → sha256(gtin + serial) — product fingerprint
- * - hashSerial(serial)     → sha256(serial) — privacy-preserving serial
- * - mnemonicSuffix(mnemonic) → first 6 hex chars of sha256(mnemonic)
+ * - dataHash(gtin, serial) → sha256(gtin + serial) — impressão digital do produto
+ * - hashSerial(serial)     → sha256(serial) — serial com preservação de privacidade
+ * - mnemonicSuffix(mnemonic) → primeiros 6 caracteres hex de sha256(mnemonic)
  */
 
-/** Convert a Uint8Array to hex string. */
+/** Converte um Uint8Array para string hexadecimal. */
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-/** SHA-256 hash of a UTF-8 string, returned as hex. */
+/** Hash SHA-256 de uma string UTF-8, retornado como hex. */
 async function sha256hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -21,24 +21,24 @@ async function sha256hex(input: string): Promise<string> {
 }
 
 /**
- * Product fingerprint: sha256(gtin + serial).
- * Used by UVerify to index and look up certificates on-chain.
+ * Impressão digital do produto: sha256(gtin + serial).
+ * Usado pelo UVerify para indexar e buscar certificados on-chain.
  */
 export async function dataHash(gtin: string, serial: string): Promise<string> {
   return sha256hex(gtin + serial);
 }
 
 /**
- * Privacy-preserving serial hash: sha256(serial).
- * The actual serial never goes on-chain — only the hash.
+ * Hash do serial com preservação de privacidade: sha256(serial).
+ * O serial real nunca vai para a blockchain — apenas o hash.
  */
 export async function hashSerial(serial: string): Promise<string> {
   return sha256hex(serial);
 }
 
 /**
- * Derive a deterministic 6-char hex suffix from the main wallet mnemonic.
- * Ensures each wallet gets a unique serial namespace.
+ * Deriva um sufixo hex determinístico de 6 caracteres a partir do mnemonic da carteira principal.
+ * Garante que cada carteira tenha um namespace de serial único.
  */
 export async function mnemonicSuffix(mnemonic: string): Promise<string> {
   const full = await sha256hex(mnemonic);

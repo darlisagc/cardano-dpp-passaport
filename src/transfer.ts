@@ -1,30 +1,30 @@
 /**
- * ADA transfer from the main wallet to 4 actor wallets.
+ * Transferência de ADA da carteira principal para as 4 carteiras dos atores.
  *
- * Builds a single transaction with 4 outputs (50 ADA each = 200 ADA total)
- * using the evolution-sdk Client. Single tx is faster and avoids UTxO
- * chaining issues.
+ * Constrói uma única transação com 4 saídas (50 ADA cada = 200 ADA no total)
+ * usando o Client do evolution-sdk. Uma única tx é mais rápida e evita
+ * problemas de encadeamento de UTxO.
  */
 
 import { Address, Assets, TransactionHash } from "@evolution-sdk/evolution";
 import { createMainWalletClient, getClientAddress } from "./wallet.ts";
 import type { ActorWallet, PipelineConfig } from "./types.ts";
 
-/** Default amount to send to each actor wallet (50 ADA = 50,000,000 lovelace). */
+/** Valor padrão para enviar a cada carteira de ator (50 ADA = 50.000.000 lovelace). */
 const DEFAULT_FUNDING_LOVELACE = 50_000_000n;
 
 /**
- * Fund actor wallets from the main wallet in a single transaction.
+ * Financia as carteiras dos atores a partir da carteira principal em uma única transação.
  *
- * Creates an evolution-sdk Client for the main wallet, then builds a
- * single Cardano transaction with one output per actor wallet (default
- * 50 ADA each = 200 ADA total). Using a single tx with multiple outputs
- * is faster than individual transfers and avoids UTxO chaining issues.
+ * Cria um Client evolution-sdk para a carteira principal, depois constrói uma
+ * única transação Cardano com uma saída por carteira de ator (padrão
+ * 50 ADA cada = 200 ADA no total). Usar uma única tx com múltiplas saídas
+ * é mais rápido que transferências individuais e evita problemas de encadeamento de UTxO.
  *
- * The tx is built → signed → submitted via the evolution-sdk pipeline.
+ * A tx é construída → assinada → submetida via pipeline do evolution-sdk.
  *
- * @param adaPerWallet — ADA to send per wallet (default 50).
- * @returns The transaction hash of the funding tx.
+ * @param adaPerWallet — ADA a enviar por carteira (padrão 50).
+ * @returns O hash da transação de financiamento.
  */
 export async function fundActorWallets(
   config: PipelineConfig,
@@ -41,7 +41,7 @@ export async function fundActorWallets(
     `Sending ${actorWallets.length} x ${adaPerWallet} ADA = ${totalAda} ADA total`,
   );
 
-  // Create evolution-sdk client with the main wallet.
+  // Cria o client evolution-sdk com a carteira principal.
   const client = createMainWalletClient(config.mainWalletMnemonic, {
     baseUrl: config.blockfrostBaseUrl,
     projectId: config.blockfrostProjectId,
@@ -50,7 +50,7 @@ export async function fundActorWallets(
   const mainAddress = await getClientAddress(client);
   console.log(`Main wallet: ${mainAddress}`);
 
-  // Build a single transaction with outputs.
+  // Constrói uma única transação com as saídas.
   const txBuilder = client.newTx();
 
   for (const wallet of actorWallets) {
@@ -61,7 +61,7 @@ export async function fundActorWallets(
     console.log(`  → ${wallet.name}: ${wallet.address} (${adaPerWallet} ADA)`);
   }
 
-  // Build → Sign → Submit
+  // Construir → Assinar → Submeter
   const signBuilder = await txBuilder.build();
   const submitBuilder = await signBuilder.sign();
   const txHashObj = await submitBuilder.submit();
@@ -74,12 +74,12 @@ export async function fundActorWallets(
 }
 
 /**
- * Wait for a transaction to be confirmed on-chain.
+ * Aguarda a confirmação de uma transação on-chain.
  *
- * Polls the Blockfrost API (GET /txs/{txHash}) every 5 seconds until
- * the tx appears on-chain (HTTP 200) or the timeout expires (default 120s).
- * Used after the funding transaction to ensure actor wallets have ADA
- * before attempting credential issuance.
+ * Consulta a API Blockfrost (GET /txs/{txHash}) a cada 5 segundos até
+ * que a tx apareça on-chain (HTTP 200) ou o timeout expire (padrão 120s).
+ * Usado após a transação de financiamento para garantir que as carteiras
+ * dos atores tenham ADA antes de tentar a emissão de credenciais.
  */
 export async function waitForConfirmation(
   config: PipelineConfig,
@@ -103,7 +103,7 @@ export async function waitForConfirmation(
         return true;
       }
     } catch {
-      // Network error — retry
+      // Erro de rede — tentar novamente
     }
     await new Promise((r) => setTimeout(r, pollInterval));
   }

@@ -1,11 +1,12 @@
 /**
- * HTML recycling certificate report.
+ * Relatório HTML de certificado de reciclagem.
  *
- * Generates a self-contained HTML report for the recycling credential
- * issued by Actor 4 (RecicLar). Features teal color scheme, lifecycle
- * flow diagram, recovered materials section, and reverse traceability.
+ * Gera um relatório HTML autocontido para a credencial de reciclagem
+ * emitida pelo Ator 4 (RecicLar). Apresenta esquema de cores em teal,
+ * diagrama de fluxo do ciclo de vida, seção de materiais recuperados
+ * e rastreabilidade reversa.
  *
- * Port of Python `RelatorioReciclagemHTML`.
+ * Porta do Python `RelatorioReciclagemHTML`.
  */
 
 import type { DppPayload } from "../types.ts";
@@ -35,7 +36,7 @@ export interface ReciclagemReportInput {
   dataHash: string;
 }
 
-/** Teal-themed stylesheet for recycling report. */
+/** Folha de estilos em teal para o relatório de reciclagem. */
 function reciclagemStylesheet(): string {
   return `* {
     margin: 0;
@@ -397,15 +398,15 @@ body {
 }`;
 }
 
-/** Build the card body content from the payload. */
+/** Constrói o conteúdo do corpo do card a partir do payload. */
 function buildBody(payload: DppPayload, txHash: string): string {
   const esc = escapeHtml;
 
-  // Tx link
+  // Link da tx
   const txLinkHtml =
     `        <div class="card-tx">Tx: ${cexplorerLink(txHash)}</div>\n`;
 
-  // Standard fields
+  // Campos padrão
   const campos: [string, string | undefined][] = [
     ["Emitente", payload["issuer"]],
     ["Produto", payload["name"]],
@@ -427,7 +428,7 @@ function buildBody(payload: DppPayload, txHash: string): string {
   }
   const dlHtml = dlItems.join("\n");
 
-  // Recovered materials
+  // Materiais recuperados
   let materiaisHtml = "";
   const mats: [string, string][] = [];
   for (const [k, v] of Object.entries(payload)) {
@@ -451,7 +452,7 @@ function buildBody(payload: DppPayload, txHash: string): string {
       "        </div>\n";
   }
 
-  // Reverse traceability
+  // Rastreabilidade reversa
   let rastreabilidadeHtml = "";
   const labelMap: Record<string, string> = {
     pack: "Pack",
@@ -514,7 +515,7 @@ function buildBody(payload: DppPayload, txHash: string): string {
   return `${card}\n${banner}`;
 }
 
-/** Generate the self-contained HTML recycling report. */
+/** Gera o relatório HTML autocontido de reciclagem. */
 export function generateReciclagemReport(input: ReciclagemReportInput): string {
   const corpo = buildBody(input.payload, input.txHash);
 
@@ -553,7 +554,7 @@ ${corpo}
 </html>`;
 }
 
-/** Generate and open the reciclagem report in the browser. */
+/** Gera e abre o relatório de reciclagem no navegador. */
 export async function openReciclagemReport(
   input: ReciclagemReportInput,
 ): Promise<string> {

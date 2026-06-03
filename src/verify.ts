@@ -1,18 +1,18 @@
 /**
- * Chain verification — verifies each credential and walks the chain
- * backward from pack (or reciclagem) to origin.
+ * Verificação de cadeia — verifica cada credencial e percorre a cadeia
+ * de trás para frente, do pack (ou reciclagem) até a origem.
  *
- * Supports two verification paths:
- *   1. UVerify API (GET /api/v1/verify/{dataHash}) — for uverify-issued credentials
- *   2. Blockfrost metadata (GET /txs/{txHash}/metadata) — for direct metadata credentials
+ * Suporta dois caminhos de verificação:
+ *   1. API UVerify (GET /api/v1/verify/{dataHash}) — para credenciais emitidas via UVerify
+ *   2. Metadados Blockfrost (GET /txs/{txHash}/metadata) — para credenciais com metadados diretos
  *
- * When a tx_hash is known, Blockfrost metadata is tried first (works for
- * both modes), falling back to UVerify API.
+ * Quando um tx_hash é conhecido, os metadados Blockfrost são tentados primeiro (funciona para
+ * ambos os modos), com fallback para a API UVerify.
  */
 
 import type { PipelineConfig } from "./types.ts";
 
-/** Credential data extracted from verification response. */
+/** Dados da credencial extraídos da resposta de verificação. */
 export interface VerifiedCredential {
   name?: string;
   issuer?: string;
@@ -22,21 +22,21 @@ export interface VerifiedCredential {
   carbonFootprint?: string;
   recycledContent?: string;
   materials: Record<string, string>;
-  references: Record<string, string>; // ref_*_tx fields
-  dataHashes: Record<string, string>; // ref_*_data_hash fields
+  references: Record<string, string>; // campos ref_*_tx
+  dataHashes: Record<string, string>; // campos ref_*_data_hash
   txHash?: string;
 }
 
 /**
- * Classify metadata fields by naming convention.
+ * Classifica os campos de metadados por convenção de nomenclatura.
  *
- * DPP payloads use prefixed keys to encode different types of data:
- *   - ref_*_tx      → tx hash references to previous actors in the chain
- *   - ref_*_data_hash → data_hash references for cross-verification
- *   - mat_*         → material composition percentages
+ * Os payloads DPP usam chaves com prefixo para codificar diferentes tipos de dados:
+ *   - ref_*_tx      → referências de hash de tx para atores anteriores na cadeia
+ *   - ref_*_data_hash → referências de data_hash para verificação cruzada
+ *   - mat_*         → percentuais de composição de materiais
  *
- * This function separates a flat metadata Record into three categorized
- * maps, stripping the "ref_" prefix from reference keys for cleaner access.
+ * Esta função separa um Record de metadados plano em três mapas categorizados,
+ * removendo o prefixo "ref_" das chaves de referência para acesso mais limpo.
  */
 function classifyFields(
   meta: Record<string, string>,
@@ -65,14 +65,14 @@ function classifyFields(
 }
 
 /**
- * Convert a Blockfrost metadata value back to a plain string.
+ * Converte um valor de metadado Blockfrost de volta para string simples.
  *
- * Metadata values from Blockfrost can be:
- *   - string: returned as-is
- *   - array: chunked strings (values > 64 bytes), joined back together
- *   - number/bigint: converted to string
+ * Valores de metadados do Blockfrost podem ser:
+ *   - string: retornado como está
+ *   - array: strings fragmentadas (valores > 64 bytes), reunidas novamente
+ *   - number/bigint: convertido para string
  *
- * This handles the chunking done by issuer-direto.ts for long values.
+ * Isso trata a fragmentação feita por issuer-direto.ts para valores longos.
  */
 function metadatumToString(value: unknown): string {
   if (typeof value === "string") return value;
@@ -82,19 +82,19 @@ function metadatumToString(value: unknown): string {
 }
 
 /**
- * Parse a Blockfrost metadata JSON object into a flat Record<string, string>.
+ * Analisa um objeto JSON de metadados Blockfrost em um Record<string, string> plano.
  *
- * Blockfrost returns transaction metadata as an array of label entries:
+ * O Blockfrost retorna metadados de transação como um array de entradas por label:
  *   [{ label: "1990", json_metadata: { key: value, ... } }]
  *
- * This function finds the DPP label (1990), extracts the json_metadata
- * object, and converts all values to strings (handling chunked arrays
- * via metadatumToString). Returns null if label 1990 is not found.
+ * Esta função encontra o label DPP (1990), extrai o objeto json_metadata
+ * e converte todos os valores para strings (tratando arrays fragmentados
+ * via metadatumToString). Retorna null se o label 1990 não for encontrado.
  */
 function parseBlockfrostMetadata(
   metadataArray: Array<{ label: string; json_metadata: unknown }>,
 ): Record<string, string> | null {
-  // Find our label (1990)
+  // Encontra nosso label (1990)
   const entry = metadataArray.find((m) => m.label === "1990");
   if (!entry || !entry.json_metadata) return null;
 
@@ -109,12 +109,12 @@ function parseBlockfrostMetadata(
 }
 
 /**
- * Verify a credential by fetching native metadata from Blockfrost.
+ * Verifica uma credencial buscando metadados nativos do Blockfrost.
  *
- * Calls GET /txs/{txHash}/metadata on the Blockfrost API, looks for
- * label 1990, and parses the DPP payload into a VerifiedCredential.
- * Works for credentials issued in metadata mode (issuer-direto.ts).
- * Returns null if the tx has no label-1990 metadata (e.g. UVerify mode).
+ * Chama GET /txs/{txHash}/metadata na API Blockfrost, procura o
+ * label 1990 e analisa o payload DPP em um VerifiedCredential.
+ * Funciona para credenciais emitidas no modo metadata (issuer-direto.ts).
+ * Retorna null se a tx não tiver metadados com label 1990 (ex: modo UVerify).
  */
 async function verifyByBlockfrostMetadata(
   config: PipelineConfig,
@@ -160,13 +160,13 @@ async function verifyByBlockfrostMetadata(
 }
 
 /**
- * Look up a credential on UVerify by data_hash.
+ * Busca uma credencial no UVerify por data_hash.
  *
- * Calls GET /api/v1/verify/{dataHash} on the UVerify public API.
- * The API returns an array of matching credentials; if tx_hash is
- * provided, the exact match is preferred. Falls back to the first
- * result if no exact tx match is found.
- * Works for credentials issued in UVerify mode (issuer.ts).
+ * Chama GET /api/v1/verify/{dataHash} na API pública do UVerify.
+ * A API retorna um array de credenciais correspondentes; se tx_hash é
+ * fornecido, a correspondência exata é preferida. Retorna o primeiro
+ * resultado como fallback se nenhuma correspondência exata de tx for encontrada.
+ * Funciona para credenciais emitidas no modo UVerify (issuer.ts).
  */
 async function verifyByDataHash(
   baseUrl: string,
@@ -189,7 +189,7 @@ async function verifyByDataHash(
     throw new Error(`Empty response for data_hash: ${dHash}`);
   }
 
-  // Find exact tx match, or use first item as fallback.
+  // Encontra correspondência exata de tx, ou usa o primeiro item como fallback.
   let match = items[0];
   if (txHash) {
     const exact = items.find(
@@ -199,7 +199,7 @@ async function verifyByDataHash(
     if (exact) match = exact;
   }
 
-  // Parse metadata.
+  // Analisa os metadados.
   let meta: Record<string, string>;
   const rawMeta = match.metadata;
   if (typeof rawMeta === "string") {
@@ -226,18 +226,18 @@ async function verifyByDataHash(
 }
 
 /**
- * Look up a credential using dual-path verification.
+ * Busca uma credencial usando verificação de caminho duplo.
  *
- * When a tx_hash is available, tries Blockfrost native metadata first
- * (works for both direct-metadata and UVerify-issued credentials that
- * happen to have label 1990). Falls back to UVerify API.
+ * Quando um tx_hash está disponível, tenta os metadados nativos Blockfrost primeiro
+ * (funciona tanto para credenciais com metadados diretos quanto para credenciais
+ * emitidas via UVerify que possuem o label 1990). Usa a API UVerify como fallback.
  */
 async function verifyCredential(
   config: PipelineConfig,
   dHash?: string,
   txHash?: string,
 ): Promise<VerifiedCredential> {
-  // Try Blockfrost metadata first when we have a tx_hash.
+  // Tenta metadados Blockfrost primeiro quando temos um tx_hash.
   if (txHash) {
     const bfResult = await verifyByBlockfrostMetadata(config, txHash);
     if (bfResult) {
@@ -246,7 +246,7 @@ async function verifyCredential(
     }
   }
 
-  // Fall back to UVerify API (requires data_hash).
+  // Fallback para a API UVerify (requer data_hash).
   if (dHash) {
     const uvResult = await verifyByDataHash(
       config.uverifyApiUrl,
@@ -263,10 +263,10 @@ async function verifyCredential(
 }
 
 /**
- * Print a verified credential summary to the console.
+ * Imprime o resumo de uma credencial verificada no console.
  *
- * Displays the credential's name, issuer, origin, GTIN, date, CO2 footprint,
- * materials breakdown (if any), and a Cexplorer link to the transaction.
+ * Exibe o nome da credencial, emissor, origem, GTIN, data, pegada de CO2,
+ * composição de materiais (se houver) e um link Cexplorer para a transação.
  */
 function printCredential(label: string, cred: VerifiedCredential): void {
   console.log(`\n  ${label}:`);
@@ -290,13 +290,13 @@ function printCredential(label: string, cred: VerifiedCredential): void {
 }
 
 /**
- * Verify the full DPP chain starting from a known data_hash.
+ * Verifica a cadeia DPP completa a partir de um data_hash conhecido.
  *
- * Walks backward: entry → pack → celula → origem
- * If the entry credential has ref_pack_tx, it's a reciclagem credential
- * and we follow it to the pack first.
+ * Percorre de trás para frente: entrada → pack → celula → origem
+ * Se a credencial de entrada tem ref_pack_tx, é uma credencial de reciclagem
+ * e seguimos primeiro até o pack.
  *
- * Uses dual-path verification: Blockfrost metadata first, UVerify API fallback.
+ * Usa verificação de caminho duplo: metadados Blockfrost primeiro, API UVerify como fallback.
  */
 export async function verifyChain(
   config: PipelineConfig,
@@ -316,12 +316,12 @@ export async function verifyChain(
     console.log(`Entry tx_hash:   ${entryTxHash}`);
   }
 
-  // Step 1: Look up the entry credential.
+  // Etapa 1: Buscar a credencial de entrada.
   console.log("\n[1/?] Looking up entry credential...");
   const entry = await verifyCredential(config, entryDataHash, entryTxHash);
   printCredential("Entry", entry);
 
-  // Auto-detect: reciclagem has ref_pack_tx
+  // Detecção automática: reciclagem tem ref_pack_tx
   let credReciclagem: VerifiedCredential | undefined;
   let credPack: VerifiedCredential;
 
@@ -344,7 +344,7 @@ export async function verifyChain(
   const totalSteps = credReciclagem ? 5 : 4;
   const offset = credReciclagem ? 1 : 0;
 
-  // Step: Follow reference to celula.
+  // Etapa: Seguir referência para célula.
   const step2 = 2 + offset;
   console.log(`\n[${step2}/${totalSteps}] Following reference to celula...`);
   let credCelula: VerifiedCredential | undefined;
@@ -357,7 +357,7 @@ export async function verifyChain(
     console.log("  WARNING: Pack does not reference a celula credential.");
   }
 
-  // Step: Follow reference to origem.
+  // Etapa: Seguir referência para origem.
   const step3 = 3 + offset;
   console.log(`\n[${step3}/${totalSteps}] Following reference to origem...`);
   let credOrigem: VerifiedCredential | undefined;
@@ -374,7 +374,7 @@ export async function verifyChain(
     }
   }
 
-  // Summary
+  // Resumo
   const stepFinal = 4 + offset;
   console.log(`\n[${stepFinal}/${totalSteps}] Chain verification summary:`);
   console.log("  " + "=".repeat(50));
@@ -393,15 +393,15 @@ export async function verifyChain(
   }
   console.log("  " + "=".repeat(50));
 
-  // Return the verified credentials for report generation.
+  // Retorna as credenciais verificadas para geração de relatórios.
   return { credOrigem, credCelula, credPack, credReciclagem };
 }
 
-// ── CLI entry point ─────────────────────────────────────────────────
-// Usage:
-//   deno task verify              → auto-detects: reciclagem if available, otherwise pack
-//   deno task verify pack         → starts from pack (DATA_HASH_PACK)
-//   deno task verify reciclagem   → starts from reciclagem (DATA_HASH_ATOR4)
+// ── Ponto de entrada CLI ─────────────────────────────────────────────────
+// Uso:
+//   deno task verify              → detecção automática: reciclagem se disponível, senão pack
+//   deno task verify pack         → inicia a partir do pack (DATA_HASH_PACK)
+//   deno task verify reciclagem   → inicia a partir da reciclagem (DATA_HASH_ATOR4)
 
 if (import.meta.main) {
   await import("@std/dotenv/load");
@@ -412,7 +412,7 @@ if (import.meta.main) {
 
   const config = loadConfig();
 
-  // Determine entry point from CLI argument or auto-detect.
+  // Determina o ponto de entrada a partir do argumento CLI ou detecção automática.
   const arg = Deno.args[0]?.toLowerCase();
   let entryDataHash: string | undefined;
   let entryTxHash: string | undefined;
@@ -430,7 +430,7 @@ if (import.meta.main) {
     console.error(`ERROR: Unknown entry point "${arg}". Use "pack" or "reciclagem".`);
     Deno.exit(1);
   } else {
-    // Auto-detect: prefer reciclagem if available, fallback to pack.
+    // Detecção automática: prefere reciclagem se disponível, fallback para pack.
     const reciclagemHash = Deno.env.get("DATA_HASH_ATOR4")?.trim();
     if (reciclagemHash) {
       entryDataHash = reciclagemHash;
@@ -457,7 +457,7 @@ if (import.meta.main) {
   const { credOrigem, credCelula, credPack, credReciclagem } =
     await verifyChain(config, entryDataHash, entryTxHash);
 
-  // Generate and open verification report in the browser.
+  // Gera e abre o relatório de verificação no navegador.
   console.log("\nGenerating verification report...");
   await openVerificationReport({
     origem: credOrigem,

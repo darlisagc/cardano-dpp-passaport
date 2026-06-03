@@ -1,11 +1,11 @@
 /**
- * UVerify credential issuance logic.
+ * Lógica de emissão de credenciais via UVerify.
  *
- * Issues DPP credentials for each actor using the UVerify JS SDK.
- * Uses the low-level core.buildTransaction() + core.submitTransaction()
- * flow for full control over custom ref_*_tx fields.
+ * Emite credenciais DPP para cada ator usando o SDK JS do UVerify.
+ * Usa o fluxo de baixo nível core.buildTransaction() + core.submitTransaction()
+ * para controle total sobre campos personalizados ref_*_tx.
  *
- * Includes automatic retries with increasing intervals for transient API errors.
+ * Inclui retentativas automáticas com intervalos crescentes para erros transitórios da API.
  */
 
 import { UVerifyClient } from "@uverify/sdk";
@@ -23,11 +23,11 @@ const MAX_ATTEMPTS = 5;
 const INITIAL_DELAY_MS = 40_000;
 
 /**
- * Wait for a UVerify transaction to be confirmed on-chain.
+ * Aguarda a confirmação de uma transação UVerify on-chain.
  *
- * Polls the UVerify confirmation endpoint (GET /api/v1/transaction/confirm/{txHash})
- * every 5 seconds until it returns HTTP 200 (confirmed) or the timeout expires.
- * Returns true if confirmed, false if timeout reached.
+ * Consulta o endpoint de confirmação do UVerify (GET /api/v1/transaction/confirm/{txHash})
+ * a cada 5 segundos até retornar HTTP 200 (confirmado) ou o timeout expirar.
+ * Retorna true se confirmado, false se o timeout foi atingido.
  */
 async function waitForUVerifyConfirmation(
   baseUrl: string,
@@ -43,7 +43,7 @@ async function waitForUVerifyConfirmation(
       );
       if (resp.ok) return true;
     } catch {
-      // Network error — retry
+      // Erro de rede — tentar novamente
     }
     await new Promise((r) => setTimeout(r, 5_000));
   }
@@ -51,13 +51,13 @@ async function waitForUVerifyConfirmation(
 }
 
 /**
- * Poll the collateral endpoint until the UTxO is confirmed available.
+ * Consulta o endpoint de colateral até que o UTxO esteja confirmado como disponível.
  *
- * Plutus V3 scripts require a collateral UTxO (>= 5 ADA) to be present
- * before building credential transactions. This function repeatedly calls
- * POST /prepare-collateral until the response indicates the collateral
- * is available (COLLATERAL_ALREADY_AVAILABLE or no unsignedTransaction).
- * Returns as soon as collateral is ready, or after timeoutMs (default 60s).
+ * Scripts Plutus V3 requerem um UTxO de colateral (>= 5 ADA) presente
+ * antes de construir transações de credencial. Esta função chama repetidamente
+ * POST /prepare-collateral até que a resposta indique que o colateral
+ * está disponível (COLLATERAL_ALREADY_AVAILABLE ou sem unsignedTransaction).
+ * Retorna assim que o colateral estiver pronto, ou após timeoutMs (padrão 60s).
  */
 async function waitForCollateralReady(
   baseUrl: string,
@@ -85,23 +85,23 @@ async function waitForCollateralReady(
         return;
       }
       if (!data?.unsignedTransaction) {
-        // No tx needed — collateral exists
+        // Nenhuma tx necessária — colateral existe
         console.log("  Collateral ready (no action needed).");
         return;
       }
     } catch {
-      // Network error — retry
+      // Erro de rede — tentar novamente
     }
   }
   console.log("  WARNING: Collateral readiness timeout — proceeding anyway.");
 }
 
 /**
- * Prepare collateral UTXO (>= 5 ADA) for Plutus V3 scripts.
+ * Prepara o UTxO de colateral (>= 5 ADA) para scripts Plutus V3.
  *
- * Uses a direct fetch for the collateral-specific endpoint (no SDK method),
- * but delegates submission to the UVerify SDK's core.submitTransaction()
- * for proper error handling and serialization.
+ * Usa fetch direto para o endpoint específico de colateral (sem método no SDK),
+ * mas delega a submissão ao core.submitTransaction() do SDK UVerify
+ * para tratamento adequado de erros e serialização.
  */
 async function prepareCollateral(
   baseUrl: string,
@@ -111,7 +111,7 @@ async function prepareCollateral(
 ): Promise<void> {
   console.log("  [collateral] Checking collateral...");
 
-  // --- Step 1: Check / request collateral via the dedicated endpoint ---
+  // --- Etapa 1: Verificar / solicitar colateral via endpoint dedicado ---
   let resp: Response;
   try {
     resp = await fetch(`${baseUrl}/api/v1/transaction/prepare-collateral`, {
@@ -156,7 +156,7 @@ async function prepareCollateral(
     return;
   }
 
-  // --- Step 2: Sign & submit ---
+  // --- Etapa 2: Assinar e submeter ---
   console.log("  [collateral] Creating collateral UTXO (5 ADA)...");
   const witnessSet = await signTx(unsignedTx);
 
@@ -164,13 +164,13 @@ async function prepareCollateral(
     let collateralTxHash: string | undefined;
 
     if (client) {
-      // Use the SDK's submitTransaction for proper error handling.
+      // Usa o submitTransaction do SDK para tratamento adequado de erros.
       collateralTxHash = await client.core.submitTransaction(
         unsignedTx,
         witnessSet,
       );
     } else {
-      // Fallback to raw fetch when no client is provided.
+      // Fallback para fetch direto quando nenhum client é fornecido.
       const submitResp = await fetch(`${baseUrl}/api/v1/transaction/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,23 +200,23 @@ async function prepareCollateral(
 }
 
 /**
- * Issue a single credential for one actor via UVerify smart contracts.
+ * Emite uma única credencial para um ator via contratos inteligentes UVerify.
  *
- * Uses the low-level UVerify flow for full control over the payload:
- *   1. Builds the DPP payload (product data + references to previous actors)
- *   2. Computes data_hash = sha256(gtin + serial) as the on-chain anchor
- *   3. Creates a UVerifyClient with the actor's signing callbacks
- *   4. Prepares collateral UTxO (>= 5 ADA) for Plutus V3 execution
- *   5. Calls core.buildTransaction() — UVerify builds the Cardano tx with
- *      the Plutus V3 reference script, redeemer, and script address output
- *   6. Signs the unsigned tx with the actor's payment key
- *   7. Calls core.submitTransaction() — UVerify submits to the Cardano node
- *   8. Waits for on-chain confirmation via polling
+ * Usa o fluxo de baixo nível do UVerify para controle total sobre o payload:
+ *   1. Constrói o payload DPP (dados do produto + referências a atores anteriores)
+ *   2. Calcula data_hash = sha256(gtin + serial) como âncora on-chain
+ *   3. Cria um UVerifyClient com os callbacks de assinatura do ator
+ *   4. Prepara o UTxO de colateral (>= 5 ADA) para execução Plutus V3
+ *   5. Chama core.buildTransaction() — UVerify constrói a tx Cardano com
+ *      o script de referência Plutus V3, redeemer e saída do endereço do script
+ *   6. Assina a tx não assinada com a chave de pagamento do ator
+ *   7. Chama core.submitTransaction() — UVerify submete ao nó Cardano
+ *   8. Aguarda confirmação on-chain via polling
  *
- * Includes exponential backoff retry (5 attempts, starting at 40s) for
- * transient errors. Handles special statuses: COLLATERAL_REQUIRED
- * (re-prepares collateral), PENDING_TRANSACTION (waits 30s).
- * Fatal error: "no utxos found" (wallet empty) — throws immediately.
+ * Inclui retentativa com backoff exponencial (5 tentativas, iniciando em 40s) para
+ * erros transitórios. Trata status especiais: COLLATERAL_REQUIRED
+ * (re-prepara colateral), PENDING_TRANSACTION (aguarda 30s).
+ * Erro fatal: "no utxos found" (carteira vazia) — lança imediatamente.
  */
 export async function issueCredential(
   config: PipelineConfig,
@@ -226,32 +226,32 @@ export async function issueCredential(
   const actor = wallet.name;
   console.log(`\n  Issuing credential for ${actor}...`);
 
-  // 1. Build the DPP payload.
+  // 1. Constrói o payload DPP.
   const { payload, serial, gtin } = await PAYLOAD_BUILDERS[actor](env);
 
-  // 2. Compute the data_hash (product fingerprint).
+  // 2. Calcula o data_hash (impressão digital do produto).
   const hash = await dataHash(gtin, serial);
   console.log(`  data_hash: ${hash}`);
 
-  // 3. Create UVerify client with this actor's signing callbacks.
+  // 3. Cria o client UVerify com os callbacks de assinatura deste ator.
   const client = new UVerifyClient({
     baseUrl: config.uverifyApiUrl,
     signTx: wallet.signTx,
     signMessage: wallet.signMessage,
   });
 
-  // 4. Prepare collateral for Plutus V3 scripts (pass client for SDK submission).
+  // 4. Prepara colateral para scripts Plutus V3 (passa client para submissão via SDK).
   await prepareCollateral(config.uverifyApiUrl, wallet.address, wallet.signTx, client);
 
-  // Poll until collateral UTxO has settled.
+  // Consulta até que o UTxO de colateral tenha sido confirmado.
   console.log("  Polling for collateral readiness...");
   await waitForCollateralReady(config.uverifyApiUrl, wallet.address);
 
-  // 5. Issue with retry and exponential backoff.
+  // 5. Emite com retentativa e backoff exponencial.
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      // Build the certificate issuance transaction.
+      // Constrói a transação de emissão do certificado.
       const buildResult = await client.core.buildTransaction({
         type: "default",
         address: wallet.address,
@@ -264,7 +264,7 @@ export async function issueCredential(
         ],
       });
 
-      // Check for status codes that need handling.
+      // Verifica códigos de status que precisam de tratamento.
       const statusMsg = (buildResult.status?.message ?? "").toUpperCase();
 
       if (statusMsg.includes("COLLATERAL") && statusMsg.includes("REQUIRED")) {
@@ -285,7 +285,7 @@ export async function issueCredential(
         continue;
       }
 
-      // Sign the unsigned transaction.
+      // Assina a transação não assinada.
       const unsignedTx = buildResult.unsignedTransaction;
       if (!unsignedTx) {
         throw new Error(
@@ -294,7 +294,7 @@ export async function issueCredential(
       }
       const witnessSet = await wallet.signTx(unsignedTx);
 
-      // Submit the signed transaction.
+      // Submete a transação assinada.
       const txHash = await client.core.submitTransaction(
         unsignedTx,
         witnessSet,
@@ -302,7 +302,7 @@ export async function issueCredential(
 
       console.log(`  tx_hash: ${txHash}`);
 
-      // Wait for on-chain confirmation before returning.
+      // Aguarda confirmação on-chain antes de retornar.
       console.log("  Waiting for on-chain confirmation...");
       const confirmed = await waitForUVerifyConfirmation(
         config.uverifyApiUrl,
@@ -318,7 +318,7 @@ export async function issueCredential(
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
 
-      // Fatal: no UTXOs — wallet is empty.
+      // Fatal: sem UTXOs — carteira vazia.
       if (lastError.message.toLowerCase().includes("no utxos found")) {
         throw lastError;
       }
@@ -340,14 +340,14 @@ export async function issueCredential(
 }
 
 /**
- * Issue credentials for all 4 actors sequentially via UVerify smart contracts.
+ * Emite credenciais para todos os 4 atores sequencialmente via contratos inteligentes UVerify.
  *
- * Issuance order: origem → celula → pack → reciclagem.
- * Each actor references the previous actor's txHash (ref_*_tx fields),
- * so parallel issuance is not possible. The PayloadEnv is updated after
- * each issuance with the resulting txHash so the next actor can reference it.
+ * Ordem de emissão: origem → celula → pack → reciclagem.
+ * Cada ator referencia o txHash do ator anterior (campos ref_*_tx),
+ * portanto a emissão paralela não é possível. O PayloadEnv é atualizado após
+ * cada emissão com o txHash resultante para que o próximo ator possa referenciá-lo.
  *
- * Used by main.ts when EMISSION_MODE=uverify (default).
+ * Usado por main.ts quando EMISSION_MODE=uverify (padrão).
  */
 export async function issueAllCredentials(
   config: PipelineConfig,
@@ -357,22 +357,22 @@ export async function issueAllCredentials(
   console.log("\n--- STEP 4: Issue credentials ---");
   const results: IssuanceResult[] = [];
 
-  // Actor 1: Origem (no references)
+  // Ator 1: Origem (sem referências)
   const r1 = await issueCredential(config, wallets.origem, env);
   env.ator1Tx = r1.txHash;
   results.push(r1);
 
-  // Actor 2: Celula (references Actor 1)
+  // Ator 2: Célula (referencia o Ator 1)
   const r2 = await issueCredential(config, wallets.celula, env);
   env.ator2Tx = r2.txHash;
   results.push(r2);
 
-  // Actor 3: Pack (references Actor 2)
+  // Ator 3: Pack (referencia o Ator 2)
   const r3 = await issueCredential(config, wallets.pack, env);
   env.ator3Tx = r3.txHash;
   results.push(r3);
 
-  // Actor 4: Reciclagem (references Actors 1, 2, 3)
+  // Ator 4: Reciclagem (referencia os Atores 1, 2, 3)
   const r4 = await issueCredential(config, wallets.reciclagem, env);
   results.push(r4);
 

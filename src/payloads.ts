@@ -1,49 +1,49 @@
 /**
- * DPP payloads for the 4 actors in the battery supply chain.
+ * Payloads DPP para os 4 atores na cadeia de suprimentos de baterias.
  *
- * Each payload is a flat Record<string, string> registered on Cardano
- * as credential metadata via UVerify. All values are strings (UVerify
- * requirement).
+ * Cada payload é um Record<string, string> plano registrado na Cardano
+ * como metadados de credencial via UVerify. Todos os valores são strings
+ * (requisito do UVerify).
  *
- * Chain:
- *   Actor 1 (Origem)     → MineraLitio:    lithium extraction
- *   Actor 2 (Celula)     → CellTech:       cell manufacturing (refs Actor 1)
- *   Actor 3 (Pack)       → PackMontadora:  battery assembly   (refs Actor 2)
- *   Actor 4 (Reciclagem) → RecicLar:       recycling          (refs 1, 2, 3)
+ * Cadeia:
+ *   Ator 1 (Origem)     → MineraLitio:    extração de lítio
+ *   Ator 2 (Celula)     → CellTech:       fabricação de células (ref. Ator 1)
+ *   Ator 3 (Pack)       → PackMontadora:  montagem de baterias  (ref. Ator 2)
+ *   Ator 4 (Reciclagem) → RecicLar:       reciclagem             (ref. 1, 2, 3)
  */
 
 import { dataHash, hashSerial, mnemonicSuffix } from "./hash.ts";
 import type { ActorName, DppPayload, PayloadResult } from "./types.ts";
 
-// ── GTINs (fixed product type identifiers) ──────────────────────
+// ── GTINs (identificadores fixos de tipo de produto) ──────────────────────
 const GTIN_ORIGEM = "7891234560099";
 const GTIN_CELULA = "7891234560105";
 const GTIN_PACK = "7891234560112";
 const GTIN_RECICL = "7891234560129";
 
-// ── Base serial prefixes (student-specific suffix appended at runtime) ──
+// ── Prefixos base de serial (sufixo específico do aluno adicionado em tempo de execução) ──
 const SERIAL_BASE_ORIGEM = "ML-JQT-2026-05";
 const SERIAL_BASE_CELULA = "CT-BA-2026-05";
 const SERIAL_BASE_PACK = "PM-SP-2026-05";
 const SERIAL_BASE_RECICL = "RL-SR-2031-09";
 
 /**
- * Context passed to payload builders: mnemonic-derived suffix and
- * tx hashes from previously issued credentials.
+ * Contexto passado aos construtores de payload: sufixo derivado do mnemonic e
+ * hashes de tx de credenciais emitidas anteriormente.
  */
 export interface PayloadEnv {
-  /** Mnemonic-derived 6-char hex suffix for serial uniqueness. */
+  /** Sufixo hex de 6 caracteres derivado do mnemonic para unicidade do serial. */
   suffix: string;
-  /** Tx hash from Actor 1 issuance (set after origem is issued). */
+  /** Hash da tx da emissão do Ator 1 (definido após a emissão da origem). */
   ator1Tx?: string;
-  /** Tx hash from Actor 2 issuance (set after celula is issued). */
+  /** Hash da tx da emissão do Ator 2 (definido após a emissão da célula). */
   ator2Tx?: string;
-  /** Tx hash from Actor 3 issuance (set after pack is issued). */
+  /** Hash da tx da emissão do Ator 3 (definido após a emissão do pack). */
   ator3Tx?: string;
 }
 
 /**
- * Derive the PayloadEnv suffix from the main wallet mnemonic.
+ * Deriva o sufixo do PayloadEnv a partir do mnemonic da carteira principal.
  */
 export async function buildPayloadEnv(
   mainMnemonic: string,
@@ -53,16 +53,16 @@ export async function buildPayloadEnv(
 }
 
 // =====================================================================
-// Actor 1 — MineraLitio (lithium extraction)
-// First in chain. No references to previous actors.
+// Ator 1 — MineraLitio (extração de lítio)
+// Primeiro na cadeia. Sem referências a atores anteriores.
 // =====================================================================
 
 /**
- * Build the DPP payload for Actor 1 (MineraLitio — lithium extraction).
+ * Constrói o payload DPP para o Ator 1 (MineraLitio — extração de lítio).
  *
- * This is the first credential in the chain, so it has no ref_* fields.
- * Includes lithium purity, ESG certifications, and environmental license.
- * The serial is made unique per run by appending the mnemonic-derived suffix.
+ * Esta é a primeira credencial na cadeia, portanto não possui campos ref_*.
+ * Inclui pureza do lítio, certificações ESG e licença ambiental.
+ * O serial é tornado único por execução ao adicionar o sufixo derivado do mnemonic.
  */
 async function payloadOrigem(env: PayloadEnv): Promise<PayloadResult> {
   const serial = `${SERIAL_BASE_ORIGEM}-${env.suffix}`;
@@ -89,17 +89,17 @@ async function payloadOrigem(env: PayloadEnv): Promise<PayloadResult> {
 }
 
 // =====================================================================
-// Actor 2 — CellTech (cell manufacturing)
-// References Actor 1 via ref_origem_tx + ref_origem_data_hash.
+// Ator 2 — CellTech (fabricação de células)
+// Referencia o Ator 1 via ref_origem_tx + ref_origem_data_hash.
 // =====================================================================
 
 /**
- * Build the DPP payload for Actor 2 (CellTech — NMC 811 cell manufacturing).
+ * Constrói o payload DPP para o Ator 2 (CellTech — fabricação de células NMC 811).
  *
- * References Actor 1 (origem) via ref_origem_tx and ref_origem_data_hash.
- * Throws if ator1Tx is not set (Actor 1 must be issued first).
- * Computes the origem data_hash from the same GTIN+serial that Actor 1 used,
- * so the verifier can cross-reference both credentials.
+ * Referencia o Ator 1 (origem) via ref_origem_tx e ref_origem_data_hash.
+ * Lança erro se ator1Tx não estiver definido (o Ator 1 deve ser emitido primeiro).
+ * Calcula o data_hash da origem a partir do mesmo GTIN+serial que o Ator 1 usou,
+ * para que o verificador possa cruzar ambas as credenciais.
  */
 async function payloadCelula(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator1Tx) {
@@ -135,16 +135,16 @@ async function payloadCelula(env: PayloadEnv): Promise<PayloadResult> {
 }
 
 // =====================================================================
-// Actor 3 — PackMontadora (battery pack assembly)
-// References Actor 2 via ref_celula_tx + ref_celula_data_hash.
+// Ator 3 — PackMontadora (montagem de pack de baterias)
+// Referencia o Ator 2 via ref_celula_tx + ref_celula_data_hash.
 // =====================================================================
 
 /**
- * Build the DPP payload for Actor 3 (PackMontadora — battery pack assembly).
+ * Constrói o payload DPP para o Ator 3 (PackMontadora — montagem de pack de baterias).
  *
- * References Actor 2 (celula) via ref_celula_tx and ref_celula_data_hash.
- * Throws if ator2Tx is not set (Actor 2 must be issued first).
- * This is typically the entry point for verification (DATA_HASH_PACK).
+ * Referencia o Ator 2 (célula) via ref_celula_tx e ref_celula_data_hash.
+ * Lança erro se ator2Tx não estiver definido (o Ator 2 deve ser emitido primeiro).
+ * Este é tipicamente o ponto de entrada para verificação (DATA_HASH_PACK).
  */
 async function payloadPack(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator2Tx) {
@@ -181,17 +181,17 @@ async function payloadPack(env: PayloadEnv): Promise<PayloadResult> {
 }
 
 // =====================================================================
-// Actor 4 — RecicLar (recycling)
-// References all 3 previous actors for full reverse traceability.
+// Ator 4 — RecicLar (reciclagem)
+// Referencia todos os 3 atores anteriores para rastreabilidade reversa completa.
 // =====================================================================
 
 /**
- * Build the DPP payload for Actor 4 (RecicLar — end-of-life recycling).
+ * Constrói o payload DPP para o Ator 4 (RecicLar — reciclagem em fim de vida).
  *
- * References all 3 previous actors (origem, celula, pack) via ref_*_tx
- * and ref_*_data_hash fields. This provides full reverse traceability
- * from recycling back to the raw lithium extraction.
- * Throws if any of the 3 prerequisite tx hashes are missing.
+ * Referencia todos os 3 atores anteriores (origem, célula, pack) via ref_*_tx
+ * e campos ref_*_data_hash. Isso fornece rastreabilidade reversa completa
+ * da reciclagem até a extração de lítio bruto.
+ * Lança erro se qualquer um dos 3 hashes de tx pré-requisitos estiver ausente.
  */
 async function payloadReciclagem(env: PayloadEnv): Promise<PayloadResult> {
   if (!env.ator1Tx || !env.ator2Tx || !env.ator3Tx) {
@@ -230,7 +230,7 @@ async function payloadReciclagem(env: PayloadEnv): Promise<PayloadResult> {
 }
 
 // =====================================================================
-// Registry: actor name → payload builder
+// Registro: nome do ator → construtor de payload
 // =====================================================================
 
 type PayloadBuilder = (env: PayloadEnv) => Promise<PayloadResult>;

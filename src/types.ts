@@ -1,14 +1,14 @@
 /**
- * Type definitions for the DPP pipeline.
+ * Definições de tipos para o pipeline DPP.
  */
 
-/** The four actors in the battery supply chain. */
+/** Os quatro atores na cadeia de suprimentos de baterias. */
 export type ActorName = "origem" | "celula" | "pack" | "reciclagem";
 
-/** Emission mode: UVerify smart contracts or direct native metadata. */
+/** Modo de emissão: contratos inteligentes UVerify ou metadados nativos diretos. */
 export type EmissionMode = "uverify" | "metadata";
 
-/** Maps actor name to the .env variable that stores its tx hash. */
+/** Mapeia o nome do ator para a variável .env que armazena o hash da tx. */
 export const ACTOR_ENV_KEY: Record<ActorName, string> = {
   origem: "ATOR1_TX",
   celula: "ATOR2_TX",
@@ -16,7 +16,7 @@ export const ACTOR_ENV_KEY: Record<ActorName, string> = {
   reciclagem: "ATOR4_TX",
 };
 
-/** Ordered list of actors for sequential issuance. */
+/** Lista ordenada de atores para emissão sequencial. */
 export const ACTOR_ORDER: ActorName[] = [
   "origem",
   "celula",
@@ -24,28 +24,28 @@ export const ACTOR_ORDER: ActorName[] = [
   "reciclagem",
 ];
 
-/** A wallet generated for one actor. */
+/** Uma carteira gerada para um ator. */
 export interface ActorWallet {
   name: ActorName;
   mnemonic: string;
   address: string;
-  /** Signs a CBOR-hex unsigned tx, returns witness set CBOR-hex. */
+  /** Assina uma tx CBOR-hex não assinada, retorna o conjunto de testemunhas CBOR-hex. */
   signTx: (unsignedCborHex: string) => Promise<string>;
-  /** CIP-8 message signing for UVerify state operations. */
+  /** Assinatura de mensagens CIP-8 para operações de estado do UVerify. */
   signMessage: (message: string) => Promise<{ key: string; signature: string }>;
-  /** Evolution SDK signing client for direct tx building (metadata mode). */
+  /** Cliente de assinatura do SDK Evolution para construção direta de tx (modo metadata). */
   // deno-lint-ignore no-explicit-any
   client: any;
 }
 
-/** Result of issuing one credential. */
+/** Resultado da emissão de uma credencial. */
 export interface IssuanceResult {
   actor: ActorName;
   txHash: string;
   dataHash: string;
 }
 
-/** Loaded and validated pipeline configuration. */
+/** Configuração do pipeline carregada e validada. */
 export interface PipelineConfig {
   blockfrostProjectId: string;
   mainWalletMnemonic: string;
@@ -54,10 +54,10 @@ export interface PipelineConfig {
   emissionMode: EmissionMode;
 }
 
-/** DPP payload: all values are strings (UVerify requirement). */
+/** Payload DPP: todos os valores são strings (requisito do UVerify). */
 export type DppPayload = Record<string, string>;
 
-/** Return type from payload builder functions. */
+/** Tipo de retorno das funções construtoras de payload. */
 export interface PayloadResult {
   payload: DppPayload;
   serial: string;

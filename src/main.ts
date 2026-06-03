@@ -1,12 +1,12 @@
 /**
- * Full pipeline orchestrator — runs the complete DPP supply chain flow.
+ * Orquestrador do pipeline completo — executa o fluxo completo da cadeia de suprimentos DPP.
  *
- * STEP 0: Load .env config (main wallet mnemonic, Blockfrost key)
- * STEP 1: Generate 4 new actor wallets (print mnemonics + addresses)
- * STEP 2: Transfer 50 ADA to each actor wallet (single tx, 4 outputs)
- * STEP 3: Wait for funding confirmation
- * STEP 4: Issue credentials sequentially (origem → celula → pack → reciclagem)
- * STEP 5: Print summary with tx hashes, Cexplorer links, UVerify verify URLs
+ * ETAPA 0: Carregar configuração .env (mnemonic da carteira principal, chave Blockfrost)
+ * ETAPA 1: Gerar 4 novas carteiras de atores (imprimir mnemonics + endereços)
+ * ETAPA 2: Transferir 50 ADA para cada carteira de ator (uma única tx, 4 saídas)
+ * ETAPA 3: Aguardar confirmação do financiamento
+ * ETAPA 4: Emitir credenciais sequencialmente (origem → celula → pack → reciclagem)
+ * ETAPA 5: Imprimir resumo com hashes de tx, links Cexplorer, URLs de verificação UVerify
  */
 
 import { loadConfig } from "./config.ts";
@@ -23,11 +23,11 @@ import { ACTOR_ENV_KEY, ACTOR_ORDER } from "./types.ts";
 import { createActorWallet, generateMnemonic } from "./wallet.ts";
 
 /**
- * Print the final pipeline summary to the console.
+ * Imprime o resumo final do pipeline no console.
  *
- * Displays the emission mode, funding tx with Cexplorer link, all actor
- * wallet addresses, and each issued credential (tx_hash, data_hash,
- * Cexplorer link). For UVerify mode, also prints the UVerify verify URL.
+ * Exibe o modo de emissão, tx de financiamento com link Cexplorer, todos os
+ * endereços das carteiras dos atores, e cada credencial emitida (tx_hash, data_hash,
+ * link Cexplorer). No modo UVerify, também imprime a URL de verificação UVerify.
  */
 function printSummary(
   results: IssuanceResult[],
@@ -62,7 +62,7 @@ function printSummary(
       );
     }
   } else {
-    // Convert API URL to the web app URL for verification links.
+    // Converte a URL da API para a URL do web app para links de verificação.
     const appUrl = config.uverifyApiUrl
       .replace("api.preprod.", "app.preprod.")
       .replace("/api/v1", "");
@@ -81,21 +81,21 @@ function printSummary(
 }
 
 /**
- * Main pipeline entry point — runs the full DPP supply chain flow.
+ * Ponto de entrada principal do pipeline — executa o fluxo completo da cadeia de suprimentos DPP.
  *
- * Executes 6 steps sequentially:
- *   Step 0: Load and validate .env configuration (Blockfrost key, mnemonic, emission mode)
- *   Step 1: Generate 4 actor wallets (BIP-39 mnemonics + Enterprise addresses)
- *   Step 2: Fund all 4 wallets in a single tx (4 x 50 ADA = 200 ADA)
- *   Step 3: Wait for funding confirmation + 15s UTxO propagation buffer
- *   Step 4: Issue credentials sequentially (origem → celula → pack → reciclagem)
- *           Mode selected by EMISSION_MODE: "uverify" uses issuer.ts, "metadata" uses issuer-direto.ts
- *   Step 5: Save all results to .env and print summary with Cexplorer links
+ * Executa 6 etapas sequencialmente:
+ *   Etapa 0: Carregar e validar configuração .env (chave Blockfrost, mnemonic, modo de emissão)
+ *   Etapa 1: Gerar 4 carteiras de atores (mnemonics BIP-39 + Enterprise addresses)
+ *   Etapa 2: Financiar todas as 4 carteiras em uma única tx (4 x 50 ADA = 200 ADA)
+ *   Etapa 3: Aguardar confirmação do financiamento + buffer de 15s para propagação de UTxO
+ *   Etapa 4: Emitir credenciais sequencialmente (origem → celula → pack → reciclagem)
+ *            Modo selecionado por EMISSION_MODE: "uverify" usa issuer.ts, "metadata" usa issuer-direto.ts
+ *   Etapa 5: Salvar todos os resultados no .env e imprimir resumo com links Cexplorer
  *
- * Entry point for `deno task run` (uverify) and `deno task run-metadata` (metadata).
+ * Ponto de entrada para `deno task run` (uverify) e `deno task run-metadata` (metadata).
  */
 async function main(): Promise<void> {
-  // ── STEP 0: Load configuration ──────────────────────────────────
+  // ── ETAPA 0: Carregar configuração ──────────────────────────────────
   console.log("=".repeat(64));
   console.log("Cardano DPP Passaport — Full Pipeline");
   console.log("=".repeat(64));
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
   console.log(`Mode:       ${config.emissionMode}`);
   console.log(`Mnemonic:   ${config.mainWalletMnemonic.split(" ").slice(0, 3).join(" ")}...`);
 
-  // ── STEP 1: Generate 4 actor wallets ────────────────────────────
+  // ── ETAPA 1: Gerar 4 carteiras de atores ────────────────────────────
   console.log("\n--- STEP 1: Generate actor wallets ---");
 
   const blockfrostConfig = {
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
 
     const num = ACTOR_NUMBERS[name];
 
-    // Save mnemonic and address to .env with actor description
+    // Salva mnemonic e endereço no .env com descrição do ator
     appendCommentToEnv(ACTOR_DESCRIPTIONS[name]);
     appendToEnv(`ATOR${num}_MNEMONIC`, mnemonic);
     appendToEnv(`ATOR${num}_ADDRESS`, wallet.address);
@@ -154,23 +154,23 @@ async function main(): Promise<void> {
     console.log(`    Saved to .env: ATOR${num}_MNEMONIC, ATOR${num}_ADDRESS`);
   }
 
-  // ── STEP 2: Fund actor wallets ──────────────────────────────────
+  // ── ETAPA 2: Financiar carteiras dos atores ──────────────────────────────────
   const fundingTxHash = await fundActorWallets(
     config,
     ACTOR_ORDER.map((n) => wallets[n]),
   );
 
-  // Save funding tx hash to .env
+  // Salva o hash da tx de financiamento no .env
   appendToEnv("FUNDING_TX", fundingTxHash);
 
-  // ── STEP 3: Wait for funding confirmation ───────────────────────
+  // ── ETAPA 3: Aguardar confirmação do financiamento ───────────────────────
   await waitForConfirmation(config, fundingTxHash);
 
-  // Extra buffer for UTxO propagation.
+  // Buffer extra para propagação de UTxO.
   console.log("Waiting 15s for UTxO propagation...");
   await new Promise((r) => setTimeout(r, 15_000));
 
-  // Generate setup receipt.
+  // Gera o recibo de setup.
   console.log("\nGenerating setup receipt...");
   await openSetupReceipt({
     wallets,
@@ -178,13 +178,13 @@ async function main(): Promise<void> {
     adaPerWallet: 50,
   });
 
-  // ── STEP 4: Issue credentials sequentially ──────────────────────
+  // ── ETAPA 4: Emitir credenciais sequencialmente ──────────────────────
   const env = await buildPayloadEnv(config.mainWalletMnemonic);
   const results = config.emissionMode === "metadata"
     ? await issueAllCredentialsDireto(config, wallets, env)
     : await issueAllCredentials(config, wallets, env);
 
-  // ── STEP 5: Save results to .env ────────────────────────────────
+  // ── ETAPA 5: Salvar resultados no .env ────────────────────────────────
   for (const r of results) {
     const num = ACTOR_NUMBERS[r.actor];
     const txKey = ACTOR_ENV_KEY[r.actor];
@@ -192,7 +192,7 @@ async function main(): Promise<void> {
     appendToEnv(`DATA_HASH_ATOR${num}`, r.dataHash);
   }
 
-  // Save TX_HASH_PACK and DATA_HASH_PACK (used by verify).
+  // Salva TX_HASH_PACK e DATA_HASH_PACK (usados pelo verify).
   const packResult = results.find((r) => r.actor === "pack");
   if (packResult) {
     appendToEnv("TX_HASH_PACK", packResult.txHash);
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
 
   console.log("\nAll results saved to .env");
 
-  // Generate emission receipts for all actors.
+  // Gera recibos de emissão para todos os atores.
   console.log("\nGenerating emission receipts...");
   for (const r of results) {
     const receiptPayload = (await PAYLOAD_BUILDERS[r.actor](env)).payload;
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
       txHash: r.txHash,
       dataHash: r.dataHash,
     });
-    // For reciclagem, also generate the recycling report.
+    // Para reciclagem, também gera o relatório de reciclagem.
     if (r.actor === "reciclagem") {
       await new Promise((resolve) => setTimeout(resolve, 500));
       await openReciclagemReport({
@@ -223,11 +223,11 @@ async function main(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  // ── STEP 6: Print summary ───────────────────────────────────────
+  // ── ETAPA 6: Imprimir resumo ───────────────────────────────────────
   printSummary(results, wallets, fundingTxHash, config);
 }
 
-// Run the pipeline.
+// Executa o pipeline.
 main().catch((err) => {
   console.error("\nFATAL ERROR:", err);
   Deno.exit(1);

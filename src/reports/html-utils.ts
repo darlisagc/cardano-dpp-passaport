@@ -1,15 +1,15 @@
 /**
- * Shared HTML utilities for receipt/report generation.
+ * Utilitários HTML compartilhados para geração de recibos/relatórios.
  *
- * Provides escape functions, Cexplorer link generation, browser-open helper,
- * actor color/icon configuration, and shared SVG constants.
+ * Fornece funções de escape, geração de links Cexplorer, auxiliar de abertura no navegador,
+ * configuração de cores/ícones dos atores e constantes SVG compartilhadas.
  */
 
 import type { ActorName } from "../types.ts";
 
-// ── HTML helpers ─────────────────────────────────────────────────────
+// ── Auxiliares HTML ─────────────────────────────────────────────────────
 
-/** Escape HTML special characters. */
+/** Escapa caracteres especiais HTML. */
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -18,7 +18,7 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Generate a clickable Cexplorer preprod link (truncated hash). */
+/** Gera um link clicável Cexplorer preprod (hash truncado). */
 export function cexplorerLink(txHash: string): string {
   const short = txHash.length > 16 ? txHash.slice(0, 16) + "..." : txHash;
   const url = `https://preprod.cexplorer.io/tx/${escapeHtml(txHash)}`;
@@ -29,11 +29,11 @@ export function cexplorerLink(txHash: string): string {
   );
 }
 
-// ── Browser open ─────────────────────────────────────────────────────
+// ── Abertura no navegador ─────────────────────────────────────────────────────
 
 /**
- * Write HTML to a temp file and open it in the default browser.
- * Returns the path to the temp file.
+ * Grava HTML em um arquivo temporário e abre no navegador padrão.
+ * Retorna o caminho do arquivo temporário.
  */
 export async function openHtmlInBrowser(
   html: string,
@@ -62,7 +62,7 @@ export async function openHtmlInBrowser(
       stderr: "null",
     });
     const child = proc.spawn();
-    // Don't await — let the browser open in the background.
+    // Não aguarda — deixa o navegador abrir em segundo plano.
     child.unref();
   } catch {
     console.log(`  (Could not auto-open browser. File saved to: ${filePath})`);
@@ -71,7 +71,7 @@ export async function openHtmlInBrowser(
   return filePath;
 }
 
-// ── SVG Icons ────────────────────────────────────────────────────────
+// ── Ícones SVG ────────────────────────────────────────────────────────
 
 export const ICON_BATTERY_HEADER =
   '<svg viewBox="0 0 48 48" class="header-icon" fill="none" ' +
@@ -168,7 +168,7 @@ export const VERIFIED_CHECK_SVG =
   'stroke="#fff" stroke-width="3.5" stroke-linecap="round" ' +
   'stroke-linejoin="round"/></svg>';
 
-// ── Actor configuration ──────────────────────────────────────────────
+// ── Configuração dos atores ──────────────────────────────────────────────
 
 export interface ActorConfig {
   titulo: string;
@@ -221,12 +221,12 @@ export const CARD_ICONS: Record<ActorName, string> = {
   reciclagem: ICON_RECYCLE,
 };
 
-// ── Shared CSS template ──────────────────────────────────────────────
+// ── Template CSS compartilhado ──────────────────────────────────────────────
 
 /**
- * Generate the shared base stylesheet for receipt/report pages.
- * Accepts header gradient colors and card border color as parameters
- * to avoid duplication across different report types.
+ * Gera a folha de estilos base compartilhada para páginas de recibos/relatórios.
+ * Aceita cores de gradiente do cabeçalho e cor da borda do card como parâmetros
+ * para evitar duplicação entre diferentes tipos de relatórios.
  */
 export function baseStylesheet(
   headerFrom: string,
