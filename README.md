@@ -50,10 +50,6 @@ source ~/.bashrc
 echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.zshrc
 echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
-
-# Fish (~/.config/fish/config.fish)
-set -Ux DENO_INSTALL $HOME/.deno
-fish_add_path $DENO_INSTALL/bin
 ```
 
 **Windows (PowerShell):**
