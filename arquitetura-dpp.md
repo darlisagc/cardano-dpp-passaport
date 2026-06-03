@@ -10,9 +10,10 @@
 - [2. Emissao de credenciais](#2-emissao-de-credenciais)
 - [3. Fluxo do verificador](#3-fluxo-do-verificador)
 - [4. Estrutura on-chain](#4-estrutura-on-chain)
-- [5. Mapa de arquivos](#5-mapa-de-arquivos)
-- [6. Analogia — o cartorio digital](#6-analogia--o-cartorio-digital)
-- [7. Glossario](#7-glossario)
+- [5. Relatorios HTML](#5-relatorios-html)
+- [6. Mapa de arquivos](#6-mapa-de-arquivos)
+- [7. Analogia — o cartorio digital](#7-analogia--o-cartorio-digital)
+- [8. Glossario](#8-glossario)
 
 ---
 
@@ -394,13 +395,44 @@ if (entry.references["pack_tx"]) {
 
 ### Ponto de entrada via CLI
 
-```bash
-# Adicione ao .env apos a emissao:
-DATA_HASH_PACK=789abc...
-TX_HASH_PACK=def456...
+O verificador suporta **auto-deteccao** do ponto de entrada e tambem aceita um argumento explicito:
 
-# Execute:
+```bash
+# Auto-deteccao (padrao):
+# Se DATA_HASH_ATOR4 existe no .env → comeca pela reciclagem (cadeia de 5 passos)
+# Senao → comeca pelo pack via DATA_HASH_PACK (cadeia de 4 passos)
 deno task verify
+
+# Ponto de entrada explicito:
+deno task verify pack          # Forca inicio pelo pack (DATA_HASH_PACK / TX_HASH_PACK)
+deno task verify reciclagem    # Forca inicio pela reciclagem (DATA_HASH_ATOR4 / ATOR4_TX)
+
+# Tasks de conveniencia:
+deno task verify-pack
+deno task verify-reciclagem
+```
+
+**Variaveis de ambiente usadas:**
+
+| Ponto de entrada | data_hash | tx_hash |
+|------------------|-----------|---------|
+| **pack** | `DATA_HASH_PACK` | `TX_HASH_PACK` |
+| **reciclagem** | `DATA_HASH_ATOR4` | `ATOR4_TX` |
+
+**Logica de auto-deteccao** (quando nenhum argumento e passado):
+
+```typescript
+// src/verify.ts — CLI entry point
+const reciclagemHash = Deno.env.get("DATA_HASH_ATOR4")?.trim();
+if (reciclagemHash) {
+  // Reciclagem disponivel → cadeia completa de 5 passos
+  entryDataHash = reciclagemHash;
+  entryTxHash = Deno.env.get("ATOR4_TX")?.trim();
+} else {
+  // Fallback para pack → cadeia de 4 passos
+  entryDataHash = Deno.env.get("DATA_HASH_PACK")?.trim();
+  entryTxHash = Deno.env.get("TX_HASH_PACK")?.trim();
+}
 ```
 
 ---
@@ -489,7 +521,78 @@ Transacao Cardano (funding)
 
 ---
 
-## 5. Mapa de arquivos
+## 5. Relatorios HTML
+
+### Arquitetura de relatorios
+
+O sistema gera **relatorios HTML auto-contidos** apos cada etapa do pipeline. Cada relatorio e um arquivo HTML completo com CSS inline (sem dependencias externas), responsivo (breakpoint em 600px) e com links clicaveis para o Cexplorer preprod.
+
+```mermaid
+graph TD
+    subgraph "Modulo reports/"
+        UTILS["html-utils.ts<br/>(utilitarios compartilhados)"]
+        SETUP["setup-receipt.ts<br/>(carteiras + funding)"]
+        EMISSION["emission-receipt.ts<br/>(por credencial)"]
+        RECICL["reciclagem-report.ts<br/>(fim de vida)"]
+        VERIF["verification-report.ts<br/>(cadeia completa)"]
+    end
+
+    SETUP --> UTILS
+    EMISSION --> UTILS
+    RECICL --> UTILS
+    VERIF --> UTILS
+
+    subgraph "Pontos de integracao"
+        CLI_S["cli/setup.ts"] --> SETUP
+        CLI_I["cli/issue.ts"] --> EMISSION
+        CLI_I --> RECICL
+        VERIFY["verify.ts CLI"] --> VERIF
+        MAIN["main.ts"] --> SETUP
+        MAIN --> EMISSION
+        MAIN --> RECICL
+    end
+```
+
+### Fluxo de geracao
+
+Cada funcao de relatorio segue o padrao:
+
+1. `generateXxxReport(input)` → retorna string HTML completa
+2. `openXxxReport(input)` → chama `generateXxxReport()` + `openHtmlInBrowser()`
+3. `openHtmlInBrowser(html, prefix)` → escreve em arquivo temp + abre no navegador
+
+```typescript
+// src/reports/html-utils.ts
+export async function openHtmlInBrowser(html: string, prefix?: string): Promise<string> {
+  const filePath = `${tmpDir}/${prefix}-${timestamp}.html`;
+  await Deno.writeTextFile(filePath, html);
+  // OS-specific: "open" (macOS), "xdg-open" (Linux), "cmd /c start" (Windows)
+  new Deno.Command(program, { args, stdout: "null", stderr: "null" }).spawn().unref();
+  return filePath;
+}
+```
+
+### Esquema de cores por ator
+
+| Ator | Card Border | Header Gradient | Uso |
+|------|------------|-----------------|-----|
+| origem | `#2e7d32` (verde) | `#1a237e → #283593` | Extracao de litio |
+| celula | `#1565c0` (azul) | `#1a237e → #283593` | Fabricacao de celulas |
+| pack | `#f9a825` (ambar) | `#1a237e → #283593` | Montagem do pack |
+| reciclagem | `#00695c` (teal) | `#004d40 → #00695c` | Reciclagem |
+
+### Tipos de relatorio
+
+| Relatorio | Input | Gerado por | Descricao |
+|-----------|-------|-----------|-----------|
+| **Setup receipt** | `{ wallets, fundingTxHash, adaPerWallet }` | `cli/setup.ts`, `main.ts` | Tabela de carteiras com badges coloridos, enderecos, mnemonicos mascarados. Card de financiamento. |
+| **Emission receipt** | `{ actor, payload, txHash, dataHash }` | `cli/issue.ts`, `main.ts` | Campos do payload, materiais, referencias na cadeia, hashes. Um por credencial emitida. |
+| **Reciclagem report** | `{ payload, txHash, dataHash }` | `cli/issue.ts` (ator 4), `main.ts` | Certificado de fim de vida com fluxo Pack → Desmontagem → Reciclagem e rastreabilidade reversa. |
+| **Verification report** | `{ origem?, celula?, pack?, reciclagem? }` | `verify.ts` CLI | Diagrama de fluxo da cadeia, cards por credencial verificada, banner de certificacao. |
+
+---
+
+## 6. Mapa de arquivos
 
 ### Estrutura do projeto
 
@@ -512,7 +615,17 @@ cardano-dpp-passaport/
     ├── issuer.ts                # Emissao via UVerify SDK (modo uverify)
     ├── issuer-direto.ts         # Emissao via metadados nativos (modo metadata)
     ├── verify.ts                # Verificacao da cadeia (ambos os modos)
-    └── main.ts                  # Orquestrador do pipeline (ambos os modos)
+    ├── main.ts                  # Orquestrador do pipeline (ambos os modos)
+    ├── state.ts                 # Persistencia de estado no .env
+    ├── cli/
+    │   ├── setup.ts             # CLI: deno task setup
+    │   └── issue.ts             # CLI: deno task issue-<ator>
+    └── reports/
+        ├── html-utils.ts        # Utilitarios HTML compartilhados
+        ├── emission-receipt.ts  # Recibo de emissao (por credencial)
+        ├── setup-receipt.ts     # Recibo de setup (carteiras + funding)
+        ├── verification-report.ts # Relatorio de verificacao da cadeia
+        └── reciclagem-report.ts # Certificado de fim de vida
 ```
 
 ### Diagrama de dependencias entre modulos
@@ -525,6 +638,7 @@ graph TD
     MAIN --> ISSUER["issuer.ts<br/>(emissao)"]
     MAIN --> PAYLOADS["payloads.ts<br/>(dados DPP)"]
     MAIN --> TYPES["types.ts<br/>(interfaces)"]
+    MAIN --> REPORTS["reports/<br/>(relatorios HTML)"]
 
     ISSUER --> PAYLOADS
     ISSUER --> HASH["hash.ts<br/>(SHA-256)"]
@@ -540,6 +654,20 @@ graph TD
 
     VERIFY["verify.ts<br/>(verificacao)"] --> CONFIG
     VERIFY --> TYPES
+    VERIFY --> REPORTS
+
+    CLI_SETUP["cli/setup.ts"] --> CONFIG
+    CLI_SETUP --> WALLET
+    CLI_SETUP --> TRANSFER
+    CLI_SETUP --> REPORTS
+
+    CLI_ISSUE["cli/issue.ts"] --> CONFIG
+    CLI_ISSUE --> ISSUER
+    CLI_ISSUE --> PAYLOADS
+    CLI_ISSUE --> REPORTS
+
+    REPORTS --> TYPES
+    REPORTS --> VERIFY
 
     EVOSDK["@evolution-sdk/evolution"]
     UVSDK["@uverify/sdk"]
@@ -564,7 +692,15 @@ graph TD
 | **`issuer.ts`** | Emissao | `@uverify/sdk` | Modo UVerify: `issueAllCredentials()` emite credenciais sequencialmente. Prepara colateral para Plutus V3, faz `core.buildTransaction()` + `signTx()` + `core.submitTransaction()`. Retentativas automaticas com intervalos crescentes (5 tentativas, inicio em 40s, dobrando a cada vez). |
 | **`issuer-direto.ts`** | Emissao | `@evolution-sdk/evolution` | Modo Metadata: `issueAllCredentialsDireto()` emite credenciais sequencialmente via metadados nativos (label 1990). Constroi transacoes com o payload DPP completo como metadado. Divide valores > 64 bytes em arrays. Paga somente a taxa de rede. |
 | **`verify.ts`** | Verificacao | Nenhuma (fetch nativo) | Verificador dual-path: tenta Blockfrost metadata (label 1990) primeiro, com fallback para API UVerify. `verifyChain()` classifica campos por prefixo, caminha a cadeia de referencias (pack → celula → origem). Auto-detecta reciclagem. Funciona para ambos os modos. |
-| **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Seleciona automaticamente `issuer.ts` ou `issuer-direto.ts` com base em `EMISSION_MODE`. Entry point para `deno task run` e `deno task run-metadata`. |
+| **`main.ts`** | Orquestrador | Todos os acima | Executa o pipeline de 6 steps: config → carteiras → funding → confirmacao → emissao → resumo. Seleciona automaticamente `issuer.ts` ou `issuer-direto.ts` com base em `EMISSION_MODE`. Gera relatorios HTML (setup receipt + emission receipts + reciclagem report). Entry point para `deno task run` e `deno task run-metadata`. |
+| **`state.ts`** | Core | Nenhuma | Helpers para persistir estado no `.env`: `appendToEnv(key, value)` escreve/atualiza variaveis, `readEnvVar(key)` le variaveis. Usado pelos comandos CLI passo a passo. |
+| **`cli/setup.ts`** | CLI | `config.ts`, `wallet.ts`, `transfer.ts`, `reports/` | Gera 4 carteiras de atores, salva mnemonicos e enderecos no `.env`, financia com tADA e aguarda confirmacao. Gera recibo HTML de setup. Entry point para `deno task setup`. |
+| **`cli/issue.ts`** | CLI | `config.ts`, `issuer.ts`, `payloads.ts`, `reports/` | Emite a credencial de um unico ator, salva tx hash e data hash no `.env`. Gera recibo HTML de emissao (+ relatorio de reciclagem para o ator 4). Entry point para `deno task issue-<ator>`. |
+| **`reports/html-utils.ts`** | Relatorios | `types.ts` | Utilitarios compartilhados: `escapeHtml()`, `cexplorerLink()`, `openHtmlInBrowser()` (escreve HTML em temp file e abre no navegador via `Deno.Command`), `ACTOR_CONFIG` (cores/titulos por ator), `baseStylesheet()` (template CSS), constantes SVG. |
+| **`reports/emission-receipt.ts`** | Relatorios | `html-utils.ts`, `types.ts` | Gera recibo HTML auto-contido para uma credencial emitida. Mostra campos do payload, materiais (`mat_*`), referencias na cadeia (`ref_*_tx` com links Cexplorer), hashes e banner de verificacao. Cores por ator. Port do Python `RelatorioEmissaoHTML`. |
+| **`reports/setup-receipt.ts`** | Relatorios | `html-utils.ts`, `types.ts` | Gera recibo HTML de setup (sem equivalente Python). Tabela de carteiras com badges coloridos, enderecos, mnemonicos mascarados (primeiras 3 palavras). Card de financiamento com ADA total e link Cexplorer. |
+| **`reports/verification-report.ts`** | Relatorios | `html-utils.ts`, `verify.ts` | Gera relatorio HTML de verificacao da cadeia completa. Diagrama de fluxo (3 ou 4 passos), cards por credencial com materiais, banner de certificacao. Port do Python `RelatorioHTML`. |
+| **`reports/reciclagem-report.ts`** | Relatorios | `html-utils.ts`, `types.ts` | Gera certificado HTML de fim de vida. Esquema teal, fluxo Pack → Desmontagem → Reciclagem, materiais recuperados, rastreabilidade reversa com links Cexplorer. Port do Python `RelatorioReciclagemHTML`. |
 
 ### Dependencias npm/jsr
 
@@ -578,7 +714,7 @@ graph TD
 
 ---
 
-## 6. Analogia — o cartorio digital
+## 7. Analogia — o cartorio digital
 
 Para entender o sistema, pense em um **cartorio digital descentralizado**:
 
@@ -638,7 +774,7 @@ No cartorio tradicional, voce confia no tabeliao (autoridade central). No Cardan
 
 ---
 
-## 7. Glossario
+## 8. Glossario
 
 | Termo | Descricao |
 |-------|-----------|

@@ -2,3 +2,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Local test/simulation scripts (not part of the main project)
+src/test-*.ts

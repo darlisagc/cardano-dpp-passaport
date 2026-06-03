@@ -38,17 +38,39 @@ Cada ator **emite** uma credencial contendo dados do produto (GTIN, origem, pega
 curl -fsSL https://deno.land/install.sh | sh
 ```
 
+Apos a instalacao, adicione o Deno ao PATH do seu shell. Dependendo do seu sistema, execute **um** dos comandos abaixo:
+
+```bash
+# Bash (~/.bashrc ou ~/.bash_profile)
+echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
+echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Zsh (~/.zshrc) — padrao no macOS
+echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.zshrc
+echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Fish (~/.config/fish/config.fish)
+set -Ux DENO_INSTALL $HOME/.deno
+fish_add_path $DENO_INSTALL/bin
+```
+
 **Windows (PowerShell):**
 
 ```powershell
 irm https://deno.land/install.ps1 | iex
 ```
 
+O instalador do Windows configura o PATH automaticamente. Reinicie o terminal apos a instalacao.
+
 **Via Homebrew (macOS):**
 
 ```bash
 brew install deno
 ```
+
+O Homebrew ja configura o PATH automaticamente — nao precisa de `source`.
 
 Apos a instalacao, verifique com:
 
@@ -122,8 +144,8 @@ deno task issue-celula-metadata       # Ator 2
 deno task issue-pack-metadata         # Ator 3
 deno task issue-reciclagem-metadata   # Ator 4
 
-# 3. Verificacao — mesmo comando para ambos os modos
-deno task verify
+# 3. Verificacao — auto-detecta reciclagem se DATA_HASH_ATOR4 existir no .env
+deno task verify                      # ou: deno task verify reciclagem
 ```
 
 **Modo UVerify (padrao):**
@@ -140,8 +162,8 @@ deno task issue-celula       # Ator 2 — requer ATOR1_TX no .env
 deno task issue-pack         # Ator 3 — requer ATOR2_TX no .env
 deno task issue-reciclagem   # Ator 4 — requer ATOR1/2/3_TX no .env
 
-# 3. Verificacao
-deno task verify
+# 3. Verificacao (auto-detecta reciclagem se DATA_HASH_ATOR4 existir)
+deno task verify                      # ou: deno task verify reciclagem
 ```
 
 Cada comando salva seu resultado no `.env` (mnemonicos, enderecos, tx hashes, data hashes). O proximo comando le de la automaticamente. Voce pode pausar entre os comandos e retomar mais tarde.
@@ -198,16 +220,44 @@ https://preprod.cexplorer.io/tx/<TX_HASH>
 ## Verificacao
 
 ```bash
+# Auto-detecta: se DATA_HASH_ATOR4 existe no .env, começa pela reciclagem;
+# senao, comeca pelo pack (DATA_HASH_PACK)
 deno task verify
+
+# Forcar ponto de entrada especifico:
+deno task verify pack          # comeca pelo pack (DATA_HASH_PACK)
+deno task verify reciclagem    # comeca pela reciclagem (DATA_HASH_ATOR4)
+
+# Tasks de conveniencia (equivalentes):
+deno task verify-pack
+deno task verify-reciclagem
 ```
 
-O verificador le `DATA_HASH_PACK` e `TX_HASH_PACK` do `.env` e percorre a cadeia de credenciais de tras para frente — pack → celula → origem — reconstruindo e validando o passaporte completo. Funciona tambem a partir de uma credencial de reciclagem (detecta automaticamente pela presenca de `ref_pack_tx`).
+O verificador percorre a cadeia de credenciais de tras para frente — reciclagem → pack → celula → origem (ou pack → celula → origem) — reconstruindo e validando o passaporte completo.
+
+**Ponto de entrada:** Por padrao, o verificador **auto-detecta** o melhor ponto de entrada:
+- Se `DATA_HASH_ATOR4` existe no `.env` → comeca pela reciclagem (cadeia completa de 4 atores)
+- Senao → comeca pelo pack (`DATA_HASH_PACK`, cadeia de 3 atores)
+- Voce pode forcar o ponto de entrada passando `pack` ou `reciclagem` como argumento
 
 **Funciona independentemente do modo de emissao** — o verificador usa verificacao dual-path:
-1. **Blockfrost metadata** (tentado primeiro quando `TX_HASH_PACK` esta disponivel) — busca metadados nativos da transacao (label 1990). Funciona para credenciais emitidas em modo metadata.
+1. **Blockfrost metadata** (tentado primeiro quando o tx hash esta disponivel) — busca metadados nativos da transacao (label 1990). Funciona para credenciais emitidas em modo metadata.
 2. **UVerify API** (fallback) — consulta `GET /api/v1/verify/{dataHash}`. Funciona para credenciais emitidas em modo UVerify.
 
 Nao e necessario informar qual modo foi usado na emissao; o verificador detecta automaticamente.
+
+## Relatorios HTML
+
+Apos cada etapa do pipeline, o sistema gera **relatorios HTML auto-contidos** que abrem automaticamente no navegador. Cada relatorio e um arquivo HTML completo (CSS inline, sem dependencias externas), responsivo e com links clicaveis para o Cexplorer preprod.
+
+| Relatorio | Gerado quando | Conteudo |
+|-----------|--------------|----------|
+| **Setup receipt** | `deno task setup` ou `deno task run` | Tabela de carteiras (enderecos, mnemonicos mascarados), transacao de financiamento com link Cexplorer |
+| **Emission receipt** | `deno task issue-<ator>` ou `deno task run` | Dados da credencial emitida, materiais, referencias na cadeia, hashes |
+| **Reciclagem report** | `deno task issue-reciclagem` ou `deno task run` | Certificado de fim de vida com fluxo Pack → Desmontagem → Reciclagem, materiais recuperados, rastreabilidade reversa |
+| **Verification report** | `deno task verify` | Diagrama da cadeia de suprimentos, cards de cada credencial verificada, banner de certificacao |
+
+Os relatorios usam esquema de cores por ator: verde (origem), azul (celula), ambar (pack), teal (reciclagem).
 
 ## Estrutura do projeto
 
@@ -218,6 +268,7 @@ cardano-dpp-passaport/
 ├── .env.example           # Template — copie para .env e preencha suas chaves
 ├── .gitignore
 ├── README.md
+├── arquitetura-dpp.md     # Documento de arquitetura tecnica
 └── src/
     ├── types.ts           # Interfaces TypeScript (ActorWallet, IssuanceResult, PipelineConfig)
     ├── config.ts          # Carrega e valida variaveis do .env
@@ -230,9 +281,15 @@ cardano-dpp-passaport/
     ├── verify.ts          # Verificacao da cadeia de credenciais (ambos os modos)
     ├── main.ts            # Orquestrador do pipeline completo (ambos os modos)
     ├── state.ts           # Helpers para persistir estado no .env (appendToEnv, readEnvVar)
-    └── cli/
-        ├── setup.ts       # CLI: deno task setup (gera carteiras + financia)
-        └── issue.ts       # CLI: deno task issue-<ator> (emite credencial individual)
+    ├── cli/
+    │   ├── setup.ts       # CLI: deno task setup (gera carteiras + financia)
+    │   └── issue.ts       # CLI: deno task issue-<ator> (emite credencial individual)
+    └── reports/
+        ├── html-utils.ts           # Utilitarios HTML compartilhados (escapeHtml, cexplorerLink, openHtmlInBrowser)
+        ├── emission-receipt.ts     # Recibo de emissao (por credencial)
+        ├── setup-receipt.ts        # Recibo de setup (carteiras + financiamento)
+        ├── verification-report.ts  # Relatorio de verificacao da cadeia completa
+        └── reciclagem-report.ts    # Certificado de fim de vida (reciclagem)
 ```
 
 ### O que cada arquivo faz
@@ -250,8 +307,13 @@ cardano-dpp-passaport/
 | `verify.ts` | Verificacao | Verificador unificado com dual-path: tenta Blockfrost metadata primeiro (label 1990), com fallback para API UVerify (`GET /api/v1/verify/{dataHash}`). Classifica campos por prefixo (`ref_*`, `mat_*`) e percorre a cadeia de referencias ate a origem. Funciona para credenciais emitidas em **ambos os modos** (UVerify e metadata). |
 | `main.ts` | Orquestrador | Executa o pipeline completo: carrega config → gera carteiras → transfere ADA → aguarda confirmacao → emite credenciais sequencialmente → imprime resumo. Seleciona automaticamente o modulo de emissao (`issuer.ts` ou `issuer-direto.ts`) com base em `EMISSION_MODE`. |
 | `state.ts` | Core | Helpers para persistir estado no `.env`: `appendToEnv(key, value)` escreve/atualiza variaveis, `readEnvVar(key)` le variaveis. Usado pelos comandos CLI passo a passo. |
-| `cli/setup.ts` | CLI | Gera 4 carteiras de atores, salva mnemonicos e enderecos no `.env`, financia com tADA e aguarda confirmacao. Equivale aos Steps 0-3 do pipeline completo. |
-| `cli/issue.ts` | CLI | Emite a credencial de um unico ator. Aceita o nome do ator como argumento, le prerequisitos do `.env`, emite via UVerify SDK ou metadados nativos (conforme `EMISSION_MODE`) e salva tx hash e data hash no `.env`. |
+| `cli/setup.ts` | CLI | Gera 4 carteiras de atores, salva mnemonicos e enderecos no `.env`, financia com tADA e aguarda confirmacao. Equivale aos Steps 0-3 do pipeline completo. Gera recibo HTML de setup. |
+| `cli/issue.ts` | CLI | Emite a credencial de um unico ator. Aceita o nome do ator como argumento, le prerequisitos do `.env`, emite via UVerify SDK ou metadados nativos (conforme `EMISSION_MODE`) e salva tx hash e data hash no `.env`. Gera recibo HTML de emissao (+ relatorio de reciclagem para o ator 4). |
+| `reports/html-utils.ts` | Relatorios | Utilitarios compartilhados: `escapeHtml()`, `cexplorerLink()`, `openHtmlInBrowser()` (abre HTML no navegador via `Deno.Command`), constantes SVG, configuracao de cores por ator, template CSS base. |
+| `reports/emission-receipt.ts` | Relatorios | Gera recibo HTML de emissao com dados da credencial, materiais, referencias na cadeia e hashes. Cores por ator. |
+| `reports/setup-receipt.ts` | Relatorios | Gera recibo HTML de setup com tabela de carteiras (enderecos, mnemonicos mascarados) e transacao de financiamento. |
+| `reports/verification-report.ts` | Relatorios | Gera relatorio HTML de verificacao com diagrama de fluxo da cadeia, cards por credencial e banner de certificacao. |
+| `reports/reciclagem-report.ts` | Relatorios | Gera certificado HTML de fim de vida com fluxo Pack → Desmontagem → Reciclagem, materiais recuperados e rastreabilidade reversa. |
 
 ## Dependencias
 
