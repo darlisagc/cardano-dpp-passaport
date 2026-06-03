@@ -21,15 +21,20 @@
  */
 
 import { loadConfig } from "./config.ts";
-import { issueCredential } from "./issuer.ts";
+import { mnemonicSuffix } from "./hash.ts";
 import { issueCredentialDireto } from "./issuer-direto.ts";
-import { verifyChain } from "./verify.ts";
+import { issueCredential } from "./issuer.ts";
+import { PAYLOAD_BUILDERS } from "./payloads.ts";
 import type { PayloadEnv } from "./payloads.ts";
+import { openEmissionReceipt } from "./reports/emission-receipt.ts";
+import { openReciclagemReport } from "./reports/reciclagem-report.ts";
+import { openSetupReceipt } from "./reports/setup-receipt.ts";
+import { openVerificationReport } from "./reports/verification-report.ts";
 import { fundActorWallets, waitForConfirmation } from "./transfer.ts";
 import type { ActorName, ActorWallet, EmissionMode, IssuanceResult, PipelineConfig } from "./types.ts";
 import { ACTOR_ORDER } from "./types.ts";
+import { verifyChain } from "./verify.ts";
 import { createActorWallet, generateMnemonic } from "./wallet.ts";
-import { mnemonicSuffix } from "./hash.ts";
 
 // ── Constantes ───────────────────────────────────────────────────────
 const NUM_STUDENTS = 5;
@@ -473,7 +478,76 @@ async function main(): Promise<void> {
     verificationResults = await verifyAllStudents(config, results);
   }
 
-  // ── FASE 5: Resumo Final ───────────────────────────────────────────
+  // ── FASE 5: Gerar HTML receipts ───────────────────────────────────
+  if (results.length > 0) {
+    console.log(`\n${"=".repeat(80)}`);
+    console.log("FASE 5: Gerar HTML receipts");
+    console.log("=".repeat(80));
+
+    // Setup receipt for student 1 (representative — all share same funding tx)
+    const student1 = results[0]!;
+    console.log(`\n  Gerando setup receipt (Aluno ${student1.studentId})...`);
+    await openSetupReceipt({
+      wallets: student1.wallets,
+      fundingTxHash: student1.fundingTxHash,
+      adaPerWallet: ADA_PER_WALLET,
+    });
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Emission receipts for each student (1 per actor = 20 total, but
+    // only open for students 1 and 2 to avoid flooding the browser).
+    for (const student of results.slice(0, 2)) {
+      console.log(`\n  Gerando emission receipts (Aluno ${student.studentId})...`);
+      const env: PayloadEnv = {
+        suffix: students.find((s) => s.studentId === student.studentId)!.suffix,
+      };
+
+      for (const cred of student.credentials) {
+        // Rebuild env tx refs for payload reconstruction
+        const prevCred = student.credentials.find((c) => c.actor === "origem");
+        if (prevCred) env.ator1Tx = prevCred.txHash;
+        const prevCred2 = student.credentials.find((c) => c.actor === "celula");
+        if (prevCred2) env.ator2Tx = prevCred2.txHash;
+        const prevCred3 = student.credentials.find((c) => c.actor === "pack");
+        if (prevCred3) env.ator3Tx = prevCred3.txHash;
+
+        const receiptPayload = (await PAYLOAD_BUILDERS[cred.actor](env)).payload;
+        await openEmissionReceipt({
+          actor: cred.actor,
+          payload: receiptPayload,
+          txHash: cred.txHash,
+          dataHash: cred.dataHash,
+        });
+        await new Promise((r) => setTimeout(r, 500));
+
+        // Reciclagem report for the reciclagem actor
+        if (cred.actor === "reciclagem") {
+          await openReciclagemReport({
+            payload: receiptPayload,
+            txHash: cred.txHash,
+            dataHash: cred.dataHash,
+          });
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+    }
+
+    // Verification report for student 1 (representative)
+    console.log(`\n  Gerando verification report (Aluno ${student1.studentId})...`);
+    const packCred1 = student1.credentials.find((c) => c.actor === "pack");
+    if (packCred1) {
+      const { credOrigem, credCelula, credPack, credReciclagem } =
+        await verifyChain(config, packCred1.dataHash, packCred1.txHash);
+      await openVerificationReport({
+        origem: credOrigem,
+        celula: credCelula,
+        pack: credPack,
+        reciclagem: credReciclagem,
+      });
+    }
+  }
+
+  // ── FASE 6: Resumo Final ───────────────────────────────────────────
   if (results.length > 0) {
     printSimulationSummary(results, verificationResults);
   }

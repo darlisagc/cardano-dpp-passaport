@@ -4,6 +4,8 @@
     "run": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/main.ts",
     "run-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/main.ts",
     "verify": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/verify.ts",
+    "verify-pack": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/verify.ts pack",
+    "verify-reciclagem": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/verify.ts reciclagem",
     "setup": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/setup.ts",
     "issue-origem": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts origem",
     "issue-celula": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts celula",
@@ -14,8 +16,8 @@
     "issue-pack-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts pack",
     "issue-reciclagem-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts reciclagem",
     "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-ffi",
-    "test-2-users": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi src/test-2-users.ts",
-    "test-5-students": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi src/test-5-students.ts"
+    "test-2-users": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/test-2-users.ts",
+    "test-5-students": "deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/test-5-students.ts"
   },
   "imports": {
     "@evolution-sdk/evolution": "npm:@evolution-sdk/evolution@~0.5.9",

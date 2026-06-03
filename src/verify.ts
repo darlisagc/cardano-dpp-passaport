@@ -398,8 +398,10 @@ export async function verifyChain(
 }
 
 // ── CLI entry point ─────────────────────────────────────────────────
-// Usage: deno task verify
-// Reads DATA_HASH_PACK and TX_HASH_PACK from .env
+// Usage:
+//   deno task verify              → auto-detects: reciclagem if available, otherwise pack
+//   deno task verify pack         → starts from pack (DATA_HASH_PACK)
+//   deno task verify reciclagem   → starts from reciclagem (DATA_HASH_ATOR4)
 
 if (import.meta.main) {
   await import("@std/dotenv/load");
@@ -409,15 +411,48 @@ if (import.meta.main) {
   );
 
   const config = loadConfig();
-  const entryDataHash = Deno.env.get("DATA_HASH_PACK")?.trim();
-  const entryTxHash = Deno.env.get("TX_HASH_PACK")?.trim();
+
+  // Determine entry point from CLI argument or auto-detect.
+  const arg = Deno.args[0]?.toLowerCase();
+  let entryDataHash: string | undefined;
+  let entryTxHash: string | undefined;
+  let entryLabel: string;
+
+  if (arg === "pack") {
+    entryDataHash = Deno.env.get("DATA_HASH_PACK")?.trim();
+    entryTxHash = Deno.env.get("TX_HASH_PACK")?.trim();
+    entryLabel = "pack";
+  } else if (arg === "reciclagem") {
+    entryDataHash = Deno.env.get("DATA_HASH_ATOR4")?.trim();
+    entryTxHash = Deno.env.get("ATOR4_TX")?.trim();
+    entryLabel = "reciclagem";
+  } else if (arg && arg !== "") {
+    console.error(`ERROR: Unknown entry point "${arg}". Use "pack" or "reciclagem".`);
+    Deno.exit(1);
+  } else {
+    // Auto-detect: prefer reciclagem if available, fallback to pack.
+    const reciclagemHash = Deno.env.get("DATA_HASH_ATOR4")?.trim();
+    if (reciclagemHash) {
+      entryDataHash = reciclagemHash;
+      entryTxHash = Deno.env.get("ATOR4_TX")?.trim();
+      entryLabel = "reciclagem (auto-detected)";
+    } else {
+      entryDataHash = Deno.env.get("DATA_HASH_PACK")?.trim();
+      entryTxHash = Deno.env.get("TX_HASH_PACK")?.trim();
+      entryLabel = "pack (default)";
+    }
+  }
 
   if (!entryDataHash) {
     console.error(
-      "ERROR: DATA_HASH_PACK is required in .env for verification.",
+      "ERROR: No entry point found. Ensure DATA_HASH_PACK or DATA_HASH_ATOR4 is set in .env.",
     );
     Deno.exit(1);
   }
+
+  console.log(`\nEntry point: ${entryLabel}`);
+  console.log(`  data_hash: ${entryDataHash}`);
+  if (entryTxHash) console.log(`  tx_hash:   ${entryTxHash}`);
 
   const { credOrigem, credCelula, credPack, credReciclagem } =
     await verifyChain(config, entryDataHash, entryTxHash);
