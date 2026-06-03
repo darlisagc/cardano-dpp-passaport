@@ -144,8 +144,8 @@ deno task issue-celula-metadata       # Ator 2
 deno task issue-pack-metadata         # Ator 3
 deno task issue-reciclagem-metadata   # Ator 4
 
-# 3. Verificacao — auto-detecta reciclagem se DATA_HASH_ATOR4 existir no .env
-deno task verify                      # ou: deno task verify reciclagem
+# 3. Verificacao (auto-detecta reciclagem se DATA_HASH_ATOR4 existir no .env)
+deno task verify
 ```
 
 **Modo UVerify (padrao):**
@@ -220,25 +220,28 @@ https://preprod.cexplorer.io/tx/<TX_HASH>
 ## Verificacao
 
 ```bash
-# Auto-detecta: se DATA_HASH_ATOR4 existe no .env, começa pela reciclagem;
-# senao, comeca pelo pack (DATA_HASH_PACK)
 deno task verify
-
-# Forcar ponto de entrada especifico:
-deno task verify pack          # comeca pelo pack (DATA_HASH_PACK)
-deno task verify reciclagem    # comeca pela reciclagem (DATA_HASH_ATOR4)
-
-# Tasks de conveniencia (equivalentes):
-deno task verify-pack
-deno task verify-reciclagem
 ```
 
 O verificador percorre a cadeia de credenciais de tras para frente — reciclagem → pack → celula → origem (ou pack → celula → origem) — reconstruindo e validando o passaporte completo.
 
-**Ponto de entrada:** Por padrao, o verificador **auto-detecta** o melhor ponto de entrada:
-- Se `DATA_HASH_ATOR4` existe no `.env` → comeca pela reciclagem (cadeia completa de 4 atores)
-- Senao → comeca pelo pack (`DATA_HASH_PACK`, cadeia de 3 atores)
-- Voce pode forcar o ponto de entrada passando `pack` ou `reciclagem` como argumento
+### Ponto de entrada
+
+Por padrao, o verificador **auto-detecta** o melhor ponto de entrada:
+
+- Se `DATA_HASH_ATOR4` existe no `.env` → comeca pela **reciclagem** (cadeia completa de 4 atores)
+- Se `DATA_HASH_ATOR4` nao existe → comeca pelo **pack** via `DATA_HASH_PACK` (cadeia de 3 atores)
+
+Para forcar um ponto de entrada especifico (ignorando a auto-deteccao):
+
+```bash
+deno task verify pack          # sempre comeca pelo pack, mesmo que reciclagem exista
+deno task verify reciclagem    # sempre comeca pela reciclagem
+
+# Tasks de conveniencia (equivalentes aos comandos acima):
+deno task verify-pack
+deno task verify-reciclagem
+```
 
 **Funciona independentemente do modo de emissao** — o verificador usa verificacao dual-path:
 1. **Blockfrost metadata** (tentado primeiro quando o tx hash esta disponivel) — busca metadados nativos da transacao (label 1990). Funciona para credenciais emitidas em modo metadata.
