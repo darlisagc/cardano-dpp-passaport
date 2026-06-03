@@ -15,7 +15,7 @@
     "issue-celula-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts celula",
     "issue-pack-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts pack",
     "issue-reciclagem-metadata": "EMISSION_MODE=metadata deno run --allow-net --allow-env --allow-read --allow-write --allow-ffi --allow-run src/cli/issue.ts reciclagem",
-    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-ffi"
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-ffi tests/"
   },
   "imports": {
     "@evolution-sdk/evolution": "npm:@evolution-sdk/evolution@~0.5.9",

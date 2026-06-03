@@ -3,9 +3,9 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { generateEmissionReceipt } from "./emission-receipt.ts";
-import type { EmissionReceiptInput } from "./emission-receipt.ts";
-import type { DppPayload } from "../types.ts";
+import { generateEmissionReceipt } from "../../src/reports/emission-receipt.ts";
+import type { EmissionReceiptInput } from "../../src/reports/emission-receipt.ts";
+import type { DppPayload } from "../../src/types.ts";
 
 function makePayload(overrides: Partial<DppPayload> = {}): DppPayload {
   return {

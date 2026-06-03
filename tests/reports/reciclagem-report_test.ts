@@ -3,9 +3,9 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { generateReciclagemReport } from "./reciclagem-report.ts";
-import type { ReciclagemReportInput } from "./reciclagem-report.ts";
-import type { DppPayload } from "../types.ts";
+import { generateReciclagemReport } from "../../src/reports/reciclagem-report.ts";
+import type { ReciclagemReportInput } from "../../src/reports/reciclagem-report.ts";
+import type { DppPayload } from "../../src/types.ts";
 
 function makePayload(overrides: Partial<DppPayload> = {}): DppPayload {
   return {

@@ -153,7 +153,7 @@ Deno.test("verifyChain: full chain (origem -> celula -> pack) resolves", async (
   }) as typeof fetch;
 
   try {
-    const { verifyChain } = await import("./verify.ts");
+    const { verifyChain } = await import("../src/verify.ts");
     const config = {
       blockfrostProjectId: "test_project_id",
       mainWalletMnemonic: "test mnemonic",
@@ -203,7 +203,7 @@ Deno.test("verifyChain: missing ref_pack_data_hash throws descriptive error", as
   }) as typeof fetch;
 
   try {
-    const { verifyChain } = await import("./verify.ts");
+    const { verifyChain } = await import("../src/verify.ts");
     const config = {
       blockfrostProjectId: "test_project_id",
       mainWalletMnemonic: "test mnemonic",
@@ -297,7 +297,7 @@ Deno.test("verifyChain: reciclagem detection works correctly", async () => {
   }) as typeof fetch;
 
   try {
-    const { verifyChain } = await import("./verify.ts");
+    const { verifyChain } = await import("../src/verify.ts");
     const config = {
       blockfrostProjectId: "test_project_id",
       mainWalletMnemonic: "test mnemonic",

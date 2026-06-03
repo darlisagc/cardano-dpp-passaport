@@ -3,9 +3,9 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { generateSetupReceipt } from "./setup-receipt.ts";
-import type { SetupReceiptInput } from "./setup-receipt.ts";
-import type { ActorWallet } from "../types.ts";
+import { generateSetupReceipt } from "../../src/reports/setup-receipt.ts";
+import type { SetupReceiptInput } from "../../src/reports/setup-receipt.ts";
+import type { ActorWallet } from "../../src/types.ts";
 
 function makeWallet(name: string, addr: string, mnemonic: string): ActorWallet {
   return {

@@ -5,7 +5,7 @@
  */
 
 import { assertEquals, assertThrows, assertStringIncludes } from "@std/assert";
-import { loadConfig } from "./config.ts";
+import { loadConfig } from "../src/config.ts";
 
 // Save original env values and restore after each test
 function withEnv(

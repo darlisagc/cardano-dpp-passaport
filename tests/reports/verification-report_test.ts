@@ -3,9 +3,9 @@
  */
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { generateVerificationReport } from "./verification-report.ts";
-import type { VerificationReportInput } from "./verification-report.ts";
-import type { VerifiedCredential } from "../verify.ts";
+import { generateVerificationReport } from "../../src/reports/verification-report.ts";
+import type { VerificationReportInput } from "../../src/reports/verification-report.ts";
+import type { VerifiedCredential } from "../../src/verify.ts";
 
 function makeCred(overrides: Partial<VerifiedCredential> = {}): VerifiedCredential {
   return {

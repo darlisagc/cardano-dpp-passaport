@@ -5,3 +5,6 @@ node_modules/
 
 # Local test/simulation scripts (not part of the main project)
 src/test-*.ts
+src/simulate-*.ts
+src/retry-*.ts
+src/verify-all-*.ts

@@ -1,5 +1,5 @@
 import { assertEquals, assertNotEquals } from "@std/assert";
-import { dataHash, hashSerial, mnemonicSuffix } from "./hash.ts";
+import { dataHash, hashSerial, mnemonicSuffix } from "../src/hash.ts";
 
 Deno.test("dataHash is deterministic", async () => {
   const h1 = await dataHash("7891234560099", "ML-JQT-2026-05-abc123");

@@ -11,7 +11,7 @@ import {
   escapeHtml,
   ICON_BATTERY_HEADER,
   VERIFIED_CHECK_SVG,
-} from "./html-utils.ts";
+} from "../../src/reports/html-utils.ts";
 
 // ── escapeHtml ───────────────────────────────────────────────────────
 

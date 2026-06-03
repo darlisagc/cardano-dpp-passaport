@@ -3,9 +3,9 @@ import {
   assertRejects,
   assertStringIncludes,
 } from "@std/assert";
-import { PAYLOAD_BUILDERS, buildPayloadEnv } from "./payloads.ts";
-import type { PayloadEnv } from "./payloads.ts";
-import { dataHash } from "./hash.ts";
+import { PAYLOAD_BUILDERS, buildPayloadEnv } from "../src/payloads.ts";
+import type { PayloadEnv } from "../src/payloads.ts";
+import { dataHash } from "../src/hash.ts";
 
 const SUFFIX = "a1b2c3";
 

@@ -36,7 +36,7 @@ async function withTempDir(
 
 Deno.test("appendToEnv creates file if missing", async () => {
   await withTempDir(async () => {
-    const { appendToEnv } = await import("./state.ts");
+    const { appendToEnv } = await import("../src/state.ts");
     appendToEnv("TEST_KEY_A", "value_a");
     const content = await Deno.readTextFile(".env");
     assertEquals(content.includes("TEST_KEY_A=value_a"), true);
@@ -50,7 +50,7 @@ Deno.test("appendToEnv updates existing key in-place", async () => {
     Deno.env.delete("EXISTING_KEY");
     Deno.env.delete("OTHER");
 
-    const { appendToEnv } = await import("./state.ts");
+    const { appendToEnv } = await import("../src/state.ts");
     appendToEnv("EXISTING_KEY", "new_value");
     const content = await Deno.readTextFile(".env");
     assertEquals(content.includes("EXISTING_KEY=new_value"), true);
@@ -65,7 +65,7 @@ Deno.test("appendToEnv appends new key", async () => {
     Deno.env.delete("EXISTING_KEY");
     Deno.env.delete("NEW_KEY");
 
-    const { appendToEnv } = await import("./state.ts");
+    const { appendToEnv } = await import("../src/state.ts");
     appendToEnv("NEW_KEY", "value2");
     const content = await Deno.readTextFile(".env");
     assertEquals(content.includes("EXISTING_KEY=value1"), true);
@@ -79,7 +79,7 @@ Deno.test("readEnvVar reads existing key", async () => {
     // Set it in env so readEnvVar finds it
     Deno.env.set("TEST_KEY_B", "hello_world");
 
-    const { readEnvVar } = await import("./state.ts");
+    const { readEnvVar } = await import("../src/state.ts");
     const value = readEnvVar("TEST_KEY_B");
     assertEquals(value, "hello_world");
     Deno.env.delete("TEST_KEY_B");
@@ -91,7 +91,7 @@ Deno.test("readEnvVar returns undefined for missing key", async () => {
     await Deno.writeTextFile(".env", "OTHER_KEY=value\n");
     Deno.env.delete("NONEXISTENT_KEY");
 
-    const { readEnvVar } = await import("./state.ts");
+    const { readEnvVar } = await import("../src/state.ts");
     const value = readEnvVar("NONEXISTENT_KEY");
     assertEquals(value, undefined);
   });
@@ -101,7 +101,7 @@ Deno.test("readEnvVar returns undefined if file doesn't exist", async () => {
   await withTempDir(async () => {
     Deno.env.delete("TEST_KEY_C");
 
-    const { readEnvVar } = await import("./state.ts");
+    const { readEnvVar } = await import("../src/state.ts");
     const value = readEnvVar("TEST_KEY_C");
     assertEquals(value, undefined);
   });

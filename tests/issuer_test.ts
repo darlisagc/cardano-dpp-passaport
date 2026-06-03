@@ -5,7 +5,7 @@
  */
 
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import type { ActorWallet, PipelineConfig } from "./types.ts";
+import type { ActorWallet, PipelineConfig } from "../src/types.ts";
 
 // We can't easily mock UVerifyClient constructor, so we mock fetch globally
 // and test the behavior through issueCredential.
